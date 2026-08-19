@@ -1,0 +1,12 @@
+flowchart LR
+  U[Next.js Web App] -->|Sanctum token| A[Laravel API]
+  P[Teams / Zoom / Meet] -->|Webhooks + APIs| A
+  A --> PG[(PostgreSQL)]
+  A --> R[(Redis Queue)]
+  A --> S[(S3 / MinIO)]
+  R --> Q[Laravel Queue Worker]
+  Q --> W[Python AI Worker]
+  W -->|Download source| S
+  W -->|Timestamped segments| Q
+  Q --> PG
+  U -->|Signed playback URL| S

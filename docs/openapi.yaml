@@ -1,0 +1,148 @@
+openapi: 3.1.0
+info:
+  title: Meeting Intelligence MVP API
+  version: 0.1.0
+  description: Starter contract for meeting registration, artifact ingestion and transcript review.
+servers:
+  - url: http://localhost:8000/api
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      security: []
+      summary: Authenticate a development user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string, format: password}
+      responses:
+        '200':
+          description: Token and user profile
+  /meetings:
+    get:
+      summary: List tenant meetings
+      responses:
+        '200': {description: Paginated meeting collection}
+    post:
+      summary: Register a meeting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMeeting'
+      responses:
+        '201': {description: Meeting created}
+  /meetings/{meetingId}:
+    get:
+      summary: Retrieve meeting, artifacts, processing jobs and current transcript
+      parameters:
+        - $ref: '#/components/parameters/MeetingId'
+      responses:
+        '200': {description: Meeting detail}
+        '404': {description: Meeting not found in tenant}
+  /meetings/{meetingId}/artifacts:
+    post:
+      summary: Upload and queue a source artifact
+      parameters:
+        - $ref: '#/components/parameters/MeetingId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [artifact_type, file]
+              properties:
+                artifact_type:
+                  type: string
+                  enum: [audio, video, provider_transcript, uploaded_transcript]
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '202': {description: Artifact accepted for processing}
+  /meetings/{meetingId}/artifacts/{artifactId}/playback:
+    get:
+      summary: Create a short-lived playback URL for an audio or video artifact
+      parameters:
+        - $ref: '#/components/parameters/MeetingId'
+        - name: artifactId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Signed playback URL and source checksum}
+        '422': {description: Artifact is not playable media}
+  /meetings/{meetingId}/transcript:
+    get:
+      summary: Retrieve the current transcript version
+      parameters:
+        - $ref: '#/components/parameters/MeetingId'
+      responses:
+        '200': {description: Transcript version with segments}
+        '404': {description: Transcript not ready}
+  /meetings/{meetingId}/speakers/{speakerId}:
+    patch:
+      summary: Confirm or correct a speaker identity
+      parameters:
+        - $ref: '#/components/parameters/MeetingId'
+        - name: speakerId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [display_name]
+              properties:
+                display_name: {type: string, maxLength: 160}
+      responses:
+        '200': {description: Speaker updated}
+  /webhooks/{provider}:
+    post:
+      security: []
+      summary: Receive a provider event
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: {type: string, enum: [teams, zoom, google-meet]}
+        - name: X-Webhook-Signature
+          in: header
+          required: true
+          schema: {type: string}
+      responses:
+        '202': {description: Event accepted idempotently}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    MeetingId:
+      name: meetingId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  schemas:
+    CreateMeeting:
+      type: object
+      required: [title]
+      properties:
+        title: {type: string, maxLength: 200}
+        provider: {type: string, enum: [manual, teams, zoom, google-meet], default: manual}
+        provider_meeting_id: {type: [string, 'null']}
+        scheduled_start_at: {type: [string, 'null'], format: date-time}
+        timezone: {type: string, default: UTC}
+        meeting_url: {type: [string, 'null'], format: uri}

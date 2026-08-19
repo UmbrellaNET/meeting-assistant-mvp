@@ -1,0 +1,26 @@
+@api = http://localhost:8000/api
+@token = replace-with-login-token
+
+### Login
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "developer@example.com",
+  "password": "password"
+}
+
+### Create meeting
+POST {{api}}/meetings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "MVP Architecture Review",
+  "provider": "manual",
+  "timezone": "Australia/Brisbane"
+}
+
+### List meetings
+GET {{api}}/meetings
+Authorization: Bearer {{token}}

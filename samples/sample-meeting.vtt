@@ -1,0 +1,13 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:05.500
+Alice: Welcome. Today we need to agree on the MVP capture workflow.
+
+00:00:05.600 --> 00:00:12.000
+Bob: I propose that we start with post-meeting transcript and recording ingestion.
+
+00:00:12.100 --> 00:00:19.500
+Alice: Agreed. Bob will prepare the Teams connector spike by Friday.
+
+00:00:19.600 --> 00:00:26.000
+Carol: We also need evidence links from every action item back to transcript timestamps.
