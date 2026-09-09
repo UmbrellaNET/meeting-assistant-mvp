@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { Manrope } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/AuthProvider';
+import { BrandingProvider } from '@/components/BrandingProvider';
 import { AppShell } from '@/components/AppShell';
+import { ToastProvider } from '@/components/ToastProvider';
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -20,7 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={manrope.className}>
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <BrandingProvider>
+            <ToastProvider>
+              <AppShell>{children}</AppShell>
+            </ToastProvider>
+          </BrandingProvider>
         </AuthProvider>
       </body>
     </html>

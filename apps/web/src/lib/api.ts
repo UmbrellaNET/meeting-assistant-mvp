@@ -4,15 +4,42 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
+const TOKEN_KEY = 'meeting_token';
+const ADMIN_TOKEN_KEY = 'meeting_admin_token';
+
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem('meeting_token');
+  return window.localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(token: string | null): void {
   if (typeof window === 'undefined') return;
-  if (token) window.localStorage.setItem('meeting_token', token);
-  else window.localStorage.removeItem('meeting_token');
+  if (token) window.localStorage.setItem(TOKEN_KEY, token);
+  else window.localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getAdminToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function stashAdminToken(): void {
+  if (typeof window === 'undefined') return;
+  const token = getToken();
+  if (token) window.localStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
+
+export function clearAdminToken(): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+}
+
+export function restoreAdminToken(): boolean {
+  const adminToken = getAdminToken();
+  if (!adminToken) return false;
+  setToken(adminToken);
+  clearAdminToken();
+  return true;
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -27,7 +54,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     try { const body = await response.json(); message = body.message ?? body.detail ?? message; } catch {}
     throw new ApiError(response.status, message);
   }
-  return response.json() as Promise<T>;
+  if (response.status === 204) return undefined as T;
+  const text = await response.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 export function formatTime(ms: number): string {

@@ -3,14 +3,14 @@ export function AdminPlaceholder({
   description,
 }: {
   title: string;
-  description: string;
+  description?: string;
 }) {
   return (
     <div>
       <header className="page-header">
         <div>
           <h1>{title}</h1>
-          <p>{description}</p>
+          {description ? <p>{description}</p> : null}
         </div>
       </header>
       <section className="panel">

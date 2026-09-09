@@ -5,10 +5,18 @@ function getInitials(name: string) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
-export function UserAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
+export function UserAvatar({
+  name,
+  src,
+  size = 'md',
+}: {
+  name: string;
+  src?: string | null;
+  size?: 'sm' | 'md' | 'lg';
+}) {
   return (
-    <span className={`user-avatar user-avatar-${size}`} aria-hidden="true">
-      {getInitials(name)}
+    <span className={`user-avatar user-avatar-${size}${src ? ' user-avatar-photo' : ''}`} aria-hidden="true">
+      {src ? <img src={src} alt="" /> : getInitials(name)}
     </span>
   );
 }

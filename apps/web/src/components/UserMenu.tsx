@@ -1,15 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { UserAvatar } from './UserAvatar';
 
 type UserMenuProps = {
   name: string;
   email: string;
+  avatarUrl?: string | null;
   onLogout: () => void;
 };
 
-export function UserMenu({ name, email, onLogout }: UserMenuProps) {
+export function UserMenu({ name, email, avatarUrl, onLogout }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -42,17 +44,33 @@ export function UserMenu({ name, email, onLogout }: UserMenuProps) {
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
       >
-        <UserAvatar name={name} />
+        <UserAvatar name={name} src={avatarUrl} />
       </button>
       {open ? (
         <div className="top-nav-popover user-menu-popover" id={panelId} role="menu">
           <div className="user-menu-header">
-            <UserAvatar name={name} size="sm" />
+            <UserAvatar name={name} src={avatarUrl} size="sm" />
             <div>
               <strong>{name}</strong>
               <small>{email}</small>
             </div>
           </div>
+          <Link
+            href="/profile"
+            className="user-menu-action"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+          >
+            Profile
+          </Link>
+          <Link
+            href="/settings"
+            className="user-menu-action"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+          >
+            Settings
+          </Link>
           <button
             type="button"
             className="user-menu-action"

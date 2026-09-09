@@ -34,4 +34,29 @@
       0 => 'Termwind\\Laravel\\TermwindServiceProvider',
     ),
   ),
+  'spatie/laravel-activitylog' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Spatie\\Activitylog\\ActivitylogServiceProvider',
+    ),
+  ),
+  'spatie/laravel-permission' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Spatie\\Permission\\PermissionServiceProvider',
+    ),
+  ),
+  'stevebauman/location' => 
+  array (
+    'aliases' => 
+    array (
+      'Location' => 'Stevebauman\\Location\\Facades\\Location',
+    ),
+    'providers' => 
+    array (
+      0 => 'Stevebauman\\Location\\LocationServiceProvider',
+    ),
+  ),
 );

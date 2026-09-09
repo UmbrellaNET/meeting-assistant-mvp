@@ -14,7 +14,6 @@ export default function CalendarPage() {
       <header className="page-header">
         <div>
           <h1>Calendar</h1>
-          <p>Month and week view of meetings in this tenant.</p>
         </div>
       </header>
       <div className="calendar-layout">
@@ -22,7 +21,7 @@ export default function CalendarPage() {
         <section className="panel">
           <div className="panel-heading">
             <div>
-              <h2>Calendar integrations</h2>
+              <h2>Calendar Integrations</h2>
               <p>Connect an external calendar when OAuth is available.</p>
             </div>
           </div>
