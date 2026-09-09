@@ -1,6 +1,7 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, KeyboardEvent, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useBranding } from '@/components/BrandingProvider';
 import { useToast } from '@/components/ToastProvider';
@@ -18,6 +19,7 @@ import {
 } from '@/lib/brandColors';
 
 type AssetType = 'logo' | 'icon' | 'favicon';
+type SettingsTab = 'preferences' | 'branding';
 
 const ACCEPT =
   'image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon,.ico,.png,.jpg,.jpeg,.webp,.svg';
@@ -148,15 +150,60 @@ function AssetUploadCard({
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+
+function SettingsPageContent() {
   const { canManageBranding } = useAuth();
   const { branding, setBranding, refresh } = useBranding();
   const toast = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [colors, setColors] = useState<BrandColors>(DEFAULT_BRAND_COLORS);
   const [timezone, setTimezone] = useState(readStoredTimezone);
   const [prefBusy, setPrefBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<AssetType | null>(null);
   const [error, setError] = useState('');
+
+  const tabs = useMemo(
+    () =>
+      [
+        { id: 'preferences' as const, label: 'Preferences' },
+        ...(canManageBranding ? [{ id: 'branding' as const, label: 'Branding' }] : []),
+      ] satisfies { id: SettingsTab; label: string }[],
+    [canManageBranding],
+  );
+
+  const requestedTab = searchParams.get('tab');
+  const tab: SettingsTab =
+    requestedTab === 'branding' && canManageBranding ? 'branding' : 'preferences';
+
+  const setTab = (next: SettingsTab) => {
+    setError('');
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === 'preferences') params.delete('tab');
+    else params.set('tab', next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft' && event.key !== 'Home' && event.key !== 'End') {
+      return;
+    }
+    event.preventDefault();
+    const last = tabs.length - 1;
+    const nextIndex =
+      event.key === 'Home' ? 0 : event.key === 'End' ? last : event.key === 'ArrowRight' ? (index + 1) % tabs.length : (index - 1 + tabs.length) % tabs.length;
+    setTab(tabs[nextIndex].id);
+    document.getElementById(`settings-tab-${tabs[nextIndex].id}`)?.focus();
+  };
 
   const savePreferences = (event: FormEvent) => {
     event.preventDefault();
@@ -288,6 +335,7 @@ export default function SettingsPage() {
   const logoPreview = branding?.logo_url ?? DEFAULT_LOGO_URL;
   const iconPreview = branding?.icon_url ?? DEFAULT_ICON_URL;
   const faviconPreview = branding?.favicon_url ?? branding?.icon_url ?? DEFAULT_FAVICON_URL;
+  const showTabs = tabs.length > 1;
 
   return (
     <div className="settings-page">
@@ -295,13 +343,44 @@ export default function SettingsPage() {
         <div>
           <span className="eyebrow">WORKSPACE</span>
           <h1>Settings</h1>
-          <p>Timezone and preferences for your account{canManageBranding ? ', plus organisation branding.' : '.'}</p>
+          <p>
+            {canManageBranding
+              ? 'Timezone, preferences, and organisation branding.'
+              : 'Timezone and preferences for your account.'}
+          </p>
         </div>
       </header>
 
+      {showTabs ? (
+        <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+          {tabs.map((item, index) => (
+            <button
+              key={item.id}
+              id={`settings-tab-${item.id}`}
+              type="button"
+              role="tab"
+              className={`settings-tab${tab === item.id ? ' active' : ''}`}
+              aria-selected={tab === item.id}
+              aria-controls={`settings-panel-${item.id}`}
+              tabIndex={tab === item.id ? 0 : -1}
+              onClick={() => setTab(item.id)}
+              onKeyDown={(event) => onTabKeyDown(event, index)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {error ? <div className="error-box">{error}</div> : null}
 
-      <section className="panel settings-panel">
+      {tab === 'preferences' ? (
+      <section
+        className="panel settings-panel"
+        id="settings-panel-preferences"
+        role={showTabs ? 'tabpanel' : undefined}
+        aria-labelledby={showTabs ? 'settings-tab-preferences' : undefined}
+      >
         <div className="panel-heading">
           <div>
             <h2>Preferences</h2>
@@ -326,9 +405,10 @@ export default function SettingsPage() {
           </div>
         </form>
       </section>
+      ) : null}
 
-      {canManageBranding ? (
-        <>
+      {tab === 'branding' && canManageBranding ? (
+        <div id="settings-panel-branding" role="tabpanel" aria-labelledby="settings-tab-branding">
       <section className="panel settings-panel">
         <div className="panel-heading">
           <div>
@@ -455,7 +535,7 @@ export default function SettingsPage() {
           </div>
         </form>
       </section>
-        </>
+        </div>
       ) : null}
     </div>
   );

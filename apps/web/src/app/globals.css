@@ -269,6 +269,11 @@ button,input,select,textarea{font:inherit}
 .branding-preview-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .branding-form-actions{justify-content:flex-start}
 .panel + .panel{margin-top:20px}
+.settings-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:-6px 0 22px;padding:0 2px 0;border-bottom:1px solid var(--line)}
+.settings-tab{border:0;background:transparent;color:var(--muted);font-weight:750;padding:10px 14px 12px;margin-bottom:-1px;border-bottom:2px solid transparent;cursor:pointer;transition:color .18s ease,border-color .18s ease}
+.settings-tab:hover{color:var(--primary-hover)}
+.settings-tab.active{color:var(--primary-hover);border-bottom-color:var(--primary)}
+.settings-tab:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:8px 8px 0 0}
 @media(max-width:1100px){
   .branding-assets{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
   .branding-assets > .branding-asset-card:first-child{grid-column:1/-1}
