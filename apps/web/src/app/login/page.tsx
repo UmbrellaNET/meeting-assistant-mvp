@@ -2,6 +2,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { DEFAULT_LOGO_URL } from '@/lib/brandColors';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -30,7 +31,7 @@ export default function LoginPage() {
       <section className="login-panel">
         <div className="brand login-brand">
           <img
-            src="/un-logo-horizontal-light.webp"
+            src={DEFAULT_LOGO_URL}
             alt="UmbrellaNET"
             className="brand-logo"
           />

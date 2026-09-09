@@ -26,7 +26,9 @@ export const DEFAULT_BRAND_COLORS: BrandColors = {
   derivedFromLogo: false,
 };
 
-export const DEFAULT_LOGO_URL = '/un-logo-horizontal-light.webp';
+export const DEFAULT_LOGO_URL = '/un-logo-horizontal.webp';
+export const DEFAULT_ICON_URL = '/apple-touch-icon.png';
+export const DEFAULT_FAVICON_URL = '/favicon.png';
 
 function clamp(n: number, min = 0, max = 255): number {
   return Math.min(max, Math.max(min, Math.round(n)));

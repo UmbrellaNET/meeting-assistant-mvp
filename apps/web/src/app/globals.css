@@ -27,8 +27,8 @@ button,input,select,textarea{font:inherit}
 .app-shell{min-height:100vh;display:grid;grid-template-columns:260px 1fr}
 .sidebar{position:fixed;inset:0 auto 0 0;width:260px;padding:28px 20px;display:flex;flex-direction:column;background:var(--panel);color:var(--ink);border-right:1px solid var(--line);z-index:20}
 .brand{display:flex;align-items:center;gap:12px}
-.brand-logo{display:block;height:auto;width:168px;max-width:100%}
-.login-brand .brand-logo{width:220px}
+.brand-logo{display:block;height:36px;width:auto;max-width:100%;object-fit:contain}
+.login-brand .brand-logo{height:44px;width:auto}
 .brand span:last-child{display:flex;flex-direction:column}
 .brand small{color:var(--muted);margin-top:3px}
 .sidebar nav{display:grid;gap:8px;margin-top:48px}
@@ -201,7 +201,7 @@ button,input,select,textarea{font:inherit}
 }
 @media(max-width:680px){
   .sidebar{padding:16px}
-  .brand-logo{width:120px}
+  .brand-logo{height:30px;width:auto}
   .sidebar nav a{font-size:13px;padding:8px 10px}
   .nav-group-toggle{font-size:13px;padding:8px 10px}
   .nav-group-link{font-size:13px;padding:8px 10px}
@@ -216,7 +216,7 @@ button,input,select,textarea{font:inherit}
   .table-row{grid-template-columns:1fr 1fr}
   .table-row span:first-child{grid-column:1/-1}
   .login-panel{padding:80px 24px 30px}
-  .login-brand .brand-logo{width:180px}
+  .login-brand .brand-logo{height:38px;width:auto}
   .transcript-segment{grid-template-columns:58px 1fr}
 }
 .calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start;margin-bottom:20px}
@@ -254,6 +254,7 @@ button,input,select,textarea{font:inherit}
 .branding-asset-card p{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
 .branding-preview{min-height:96px;display:grid;place-items:center;border-radius:12px;background:var(--panel);border:1px dashed #D4C4D0;padding:12px;overflow:hidden}
 .branding-preview img{max-width:100%;max-height:72px;object-fit:contain}
+.branding-preview-icon{background:#0A0A0B;border-color:#1C1C1E}
 .branding-preview-icon img{max-height:48px;max-width:48px}
 .branding-asset-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:auto}
 .branding-file-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

@@ -8,6 +8,8 @@ import { api } from '@/lib/api';
 import {
   darkenHex,
   DEFAULT_BRAND_COLORS,
+  DEFAULT_FAVICON_URL,
+  DEFAULT_ICON_URL,
   DEFAULT_LOGO_URL,
   deriveColorsFromLogo,
   softenHex,
@@ -284,8 +286,8 @@ export default function SettingsPage() {
   };
 
   const logoPreview = branding?.logo_url ?? DEFAULT_LOGO_URL;
-  const iconPreview = branding?.icon_url;
-  const faviconPreview = branding?.favicon_url ?? branding?.icon_url;
+  const iconPreview = branding?.icon_url ?? DEFAULT_ICON_URL;
+  const faviconPreview = branding?.favicon_url ?? branding?.icon_url ?? DEFAULT_FAVICON_URL;
 
   return (
     <div className="settings-page">
@@ -349,7 +351,7 @@ export default function SettingsPage() {
           <AssetUploadCard
             title="Icon"
             description="Square icon for compact surfaces."
-            preview={iconPreview ?? null}
+            preview={iconPreview}
             emptyLabel="No icon uploaded"
             hasAsset={Boolean(branding?.has_icon)}
             uploading={uploading === 'icon'}
@@ -361,7 +363,7 @@ export default function SettingsPage() {
           <AssetUploadCard
             title="Favicon"
             description="Browser tab icon. Falls back to the app icon."
-            preview={faviconPreview ?? null}
+            preview={faviconPreview}
             emptyLabel="No favicon uploaded"
             hasAsset={Boolean(branding?.has_favicon)}
             uploading={uploading === 'favicon'}

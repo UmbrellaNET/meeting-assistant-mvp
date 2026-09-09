@@ -13,6 +13,8 @@ import { api } from '@/lib/api';
 import {
   applyBrandColors,
   DEFAULT_BRAND_COLORS,
+  DEFAULT_FAVICON_URL,
+  DEFAULT_ICON_URL,
   DEFAULT_LOGO_URL,
   type Branding,
   type BrandColors,
@@ -22,8 +24,8 @@ type BrandingContextValue = {
   branding: Branding | null;
   loading: boolean;
   logoUrl: string;
-  iconUrl: string | null;
-  faviconUrl: string | null;
+  iconUrl: string;
+  faviconUrl: string;
   refresh: () => Promise<void>;
   setBranding: (next: Branding) => void;
 };
@@ -32,14 +34,12 @@ const BrandingContext = createContext<BrandingContextValue | null>(null);
 
 function upsertFavicon(href: string | null): void {
   if (typeof document === 'undefined') return;
+  const url = href || DEFAULT_FAVICON_URL;
   const existing = document.querySelector<HTMLLinkElement>('link[data-brand-favicon="true"]');
-  if (!href) {
-    existing?.remove();
-    return;
-  }
   const link = existing ?? document.createElement('link');
   link.rel = 'icon';
-  link.href = href;
+  link.type = 'image/png';
+  link.href = url;
   link.setAttribute('data-brand-favicon', 'true');
   if (!existing) document.head.appendChild(link);
 }
@@ -53,7 +53,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       setBrandingState(null);
       applyBrandColors(null);
-      upsertFavicon(null);
+      upsertFavicon(DEFAULT_FAVICON_URL);
       return;
     }
     setLoading(true);
@@ -61,11 +61,11 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       const data = await api<Branding>('/settings/branding');
       setBrandingState(data);
       applyBrandColors(data.colors);
-      upsertFavicon(data.favicon_url ?? data.icon_url);
+      upsertFavicon(data.favicon_url ?? data.icon_url ?? DEFAULT_FAVICON_URL);
     } catch {
       setBrandingState(null);
       applyBrandColors(DEFAULT_BRAND_COLORS);
-      upsertFavicon(null);
+      upsertFavicon(DEFAULT_FAVICON_URL);
     } finally {
       setLoading(false);
     }
@@ -78,14 +78,14 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) {
       applyBrandColors(null);
-      upsertFavicon(null);
+      upsertFavicon(DEFAULT_FAVICON_URL);
     }
   }, [user]);
 
   const setBranding = useCallback((next: Branding) => {
     setBrandingState(next);
     applyBrandColors(next.colors);
-    upsertFavicon(next.favicon_url ?? next.icon_url);
+    upsertFavicon(next.favicon_url ?? next.icon_url ?? DEFAULT_FAVICON_URL);
   }, []);
 
   const value = useMemo<BrandingContextValue>(
@@ -93,8 +93,8 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       branding,
       loading,
       logoUrl: branding?.logo_url ?? DEFAULT_LOGO_URL,
-      iconUrl: branding?.icon_url ?? null,
-      faviconUrl: branding?.favicon_url ?? branding?.icon_url ?? null,
+      iconUrl: branding?.icon_url ?? DEFAULT_ICON_URL,
+      faviconUrl: branding?.favicon_url ?? branding?.icon_url ?? DEFAULT_FAVICON_URL,
       refresh,
       setBranding,
     }),
