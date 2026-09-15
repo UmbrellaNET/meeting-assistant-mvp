@@ -229,13 +229,21 @@ php artisan migrate --seed --force
 Demo account:
 
 ```text
-Email: developer@example.com
+Email: meetings@umbrellanet.com
 Password: password
 ```
 
-## 5. Run the four app processes
+A standard user also exists: `user@umbrellanet.com` / `password`.
 
-Open **four** PowerShell windows from the repo root.
+## 5. Run the app processes
+
+After the first-time setup above, start everything from the repo root with:
+
+```powershell
+.\dev
+```
+
+Or open **four** PowerShell windows manually:
 
 **Terminal A — API**
 
@@ -333,10 +341,22 @@ curl.exe -s -X POST "http://127.0.0.1:8000/api/meetings/$($meeting.id)/artifacts
 | Web cannot reach API | Wrong public API URL | Set `NEXT_PUBLIC_API_URL=http://localhost:8000/api` when starting Next |
 | Port already in use | Another process bound | Change ports in env / artisan / uvicorn / next, or stop the conflicting process |
 
-## Day-to-day restart checklist
+## Day-to-day restart
 
-1. Start Postgres (ServBay) + Redis + MinIO if not already running.
-2. Start the four app terminals (API, queue, AI worker, web).
-3. Open http://localhost:3000.
+From the repo root, with Postgres running in ServBay:
+
+```powershell
+.\dev
+```
+
+That starts Redis/MinIO if needed, opens API, queue, AI worker, and web windows, and launches http://127.0.0.1:3000.
+
+Stop the app processes with:
+
+```powershell
+.\dev-stop
+```
+
+Postgres, Redis, and MinIO are left running.
 
 You do not need to re-run `composer install` / `npm install` / `pip install` or migrations unless dependencies or schema changed.
