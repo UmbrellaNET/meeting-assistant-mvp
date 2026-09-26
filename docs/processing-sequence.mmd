@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant User
+  participant Web as Next.js
+  participant API as Laravel API
+  participant S3 as Object Storage
+  participant Queue as Redis Queue
+  participant Worker as Python Worker
+  participant DB as PostgreSQL
+
+  User->>Web: Upload transcript or recording
+  Web->>API: POST /meetings/{id}/artifacts
+  API->>S3: Store immutable source artifact
+  API->>DB: Create artifact record
+  API->>Queue: Dispatch ProcessMeetingArtifact
+  API-->>Web: 202 Accepted
+  Queue->>Worker: POST /v1/transcribe with signed URL
+  Worker->>S3: Download artifact
+  Worker-->>Queue: Normalized speaker segments
+  Queue->>DB: Create transcript version and segments
+  Queue->>DB: Mark meeting ready
+  Web->>API: GET /meetings/{id}
+  API-->>Web: Meeting, artifacts and transcript
