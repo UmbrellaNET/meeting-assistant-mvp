@@ -12,6 +12,55 @@ export function getToken(): string | null {
   return window.localStorage.getItem(TOKEN_KEY);
 }
 
+
+export async function downloadFile(path: string, fallbackFilename: string): Promise<void> {
+  const token = getToken();
+  const headers = new Headers();
+  headers.set('Accept', '*/*');
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const response = await fetch(`${API_URL}${path}`, { headers, cache: 'no-store' });
+
+  if (!response.ok) {
+    let message = `Download failed with status ${response.status}`;
+    try {
+      const body = await response.json();
+      message = body.message ?? body.detail ?? message;
+    } catch {
+      
+    }
+    throw new ApiError(response.status, message);
+  }
+
+ 
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match?.[1] ?? fallbackFilename;
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function getShareLink(meetingId: string): Promise<{ share_token: string; url: string }> {
+  return api<{ share_token: string; url: string }>(`/meetings/${meetingId}/share-link`, {
+    method: 'POST',
+  });
+}
+
+export async function revokeShareLink(meetingId: string): Promise<void> {
+  await api<void>(`/meetings/${meetingId}/share-link`, {
+    method: 'DELETE',
+  });
+}
+
+
 export function setToken(token: string | null): void {
   if (typeof window === 'undefined') return;
   if (token) window.localStorage.setItem(TOKEN_KEY, token);

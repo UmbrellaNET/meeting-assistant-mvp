@@ -7,7 +7,7 @@ import { IconButton, TableActions } from '@/components/IconButton';
 import { ParticipationBadge } from '@/components/ParticipationBadge';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useToast } from '@/components/ToastProvider';
-import { api } from '@/lib/api';
+import { api, downloadFile, getShareLink } from '@/lib/api';
 import { unwrapPaginated } from '@/lib/lists';
 import type { Meeting, ParticipationRole } from '@/lib/types';
 
@@ -52,6 +52,24 @@ export default function MeetingsIndex() {
     }
   };
 
+  const exportToCalendar = async (meeting: Meeting) => {
+    try {
+      await downloadFile(`/meetings/${meeting.id}/calendar.ics`, `${meeting.title}.ics`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to download calendar file');
+    }
+  };
+
+  const copyShareLink = async (meeting: Meeting) => {
+    try {
+      const { url } = await getShareLink(meeting.id);
+      await navigator.clipboard.writeText(url);
+      toast.success('Share link copied to clipboard.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to generate share link');
+    }
+  };
+
   return (
     <div>
       <header className="page-header">
@@ -70,7 +88,7 @@ export default function MeetingsIndex() {
             ? 'Create a meeting to become Convenor, or accept an invitation to attend.'
             : 'Try another participation filter, or create a meeting.'
         }
-        cols="minmax(0,2fr) .9fr 1fr 1fr 1fr 96px"
+        cols="minmax(0,2fr) .9fr 1fr 1fr 1fr 128px"
         action={<IconButton name="plus" label="Create Meeting" variant="primary" href="/meetings/new" />}
         filters={
           <div className="filter-row" role="tablist" aria-label="Participation filter">
@@ -112,6 +130,8 @@ export default function MeetingsIndex() {
             new Date(meeting.created_at).toLocaleDateString(),
             <TableActions key="actions">
               <IconButton name="view" label="View Meeting" href={`/meetings/${meeting.id}`} />
+              <IconButton name="download" label="Add to Calendar" onClick={() => void exportToCalendar(meeting)} />
+              <IconButton name="link" label="Copy Share Link" onClick={() => void copyShareLink(meeting)} />
               <IconButton name="trash" label="Delete Meeting" variant="danger" onClick={() => setDeleting(meeting)} />
             </TableActions>,
           ],

@@ -9,7 +9,7 @@ import { ParticipationBadge } from '@/components/ParticipationBadge';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/ToastProvider';
-import { api } from '@/lib/api';
+import { api, downloadFile } from '@/lib/api';
 import {
   formatWhen,
   invitationMeetingId,
@@ -137,6 +137,14 @@ export default function Dashboard() {
     }
   };
 
+  const exportToCalendar = async (meeting: Meeting) => {
+    try {
+      await downloadFile(`/meetings/${meeting.id}/calendar.ics`, `${meeting.title}.ics`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to download calendar file');
+    }
+  };
+
   return (
     <div>
       <header className="page-header">
@@ -234,7 +242,7 @@ export default function Dashboard() {
         loading={workspace === null && !error}
         emptyTitle="Nothing scheduled this week"
         emptyDescription="Create a meeting to become Convenor, or accept an invitation."
-        cols="minmax(0,2fr) minmax(0,1.4fr) .9fr 1fr 96px"
+        cols="minmax(0,2fr) minmax(0,1.4fr) .9fr 1fr 128px"
         columns={[
           { key: 'meeting', label: 'Meeting' },
           { key: 'when', label: 'When' },
@@ -251,6 +259,7 @@ export default function Dashboard() {
             <StatusBadge key="status" value={meeting.status} />,
             <TableActions key="actions">
               <IconButton name="view" label="View Meeting" href={`/meetings/${meeting.id}`} />
+              <IconButton name="download" label="Add to Calendar" onClick={() => void exportToCalendar(meeting)} />
               <IconButton name="trash" label="Delete Meeting" variant="danger" onClick={() => setDeleting(meeting)} />
             </TableActions>,
           ],
@@ -261,7 +270,7 @@ export default function Dashboard() {
         loading={workspace === null && !error}
         emptyTitle="No notes yet"
         emptyDescription="Notes appear after a meeting has a transcript or uploaded artifacts."
-        cols="minmax(0,2fr) minmax(0,1.3fr) .9fr 1fr 96px"
+        cols="minmax(0,2fr) minmax(0,1.3fr) .9fr 1fr 128px"
         columns={[
           { key: 'meeting', label: 'Meeting' },
           { key: 'processing', label: 'Processing' },
@@ -278,6 +287,7 @@ export default function Dashboard() {
             <StatusBadge key="status" value={meeting.status} />,
             <TableActions key="actions">
               <IconButton name="view" label="View Meeting" href={`/meetings/${meeting.id}`} />
+              <IconButton name="download" label="Add to Calendar" onClick={() => void exportToCalendar(meeting)} />
               <IconButton name="trash" label="Delete Meeting" variant="danger" onClick={() => setDeleting(meeting)} />
             </TableActions>,
           ],

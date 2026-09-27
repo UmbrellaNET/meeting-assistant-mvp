@@ -17,3 +17,16 @@ apps/api/storage/logs/*
 services/worker/.venv/
 services/worker/__pycache__/
 services/worker/.pytest_cache/
+
+# Database
+apps/api/database/*.sqlite
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Build/test caches
+apps/api/.phpunit.result.cache
+apps/web/tsconfig.tsbuildinfo
+apps/api/bootstrap/cache/*.php
+!apps/api/bootstrap/cache/.gitkeep

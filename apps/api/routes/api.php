@@ -15,6 +15,9 @@ use App\Http\Controllers\Api\SpeakerController;
 use App\Http\Controllers\Api\TenantUserController;
 use App\Http\Controllers\Api\TranscriptController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\CalendarExportController;
+use App\Http\Controllers\Api\PublicCalendarExportController;
+use App\Http\Controllers\Api\ShareLinkController;
 
 Route::prefix('auth')->group(function (): void {
     Route::post('register', [AuthController::class, 'register']);
@@ -24,6 +27,9 @@ Route::prefix('auth')->group(function (): void {
 Route::post('webhooks/{provider}', ProviderWebhookController::class)
     ->whereIn('provider', ['teams', 'zoom', 'google-meet']);
 
+Route::get('calendar/{token}/calendar.ics', PublicCalendarExportController::class)
+    ->where('token', '[A-Za-z0-9]{40}');
+
 Route::middleware('api.token')->group(function (): void {
     Route::get('auth/me', [AuthController::class, 'me']);
     Route::patch('auth/profile', [AuthController::class, 'profile'])->middleware('permission:profile.update');
@@ -32,6 +38,9 @@ Route::middleware('api.token')->group(function (): void {
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::post('auth/stop-impersonation', [AuthController::class, 'stopImpersonation']);
 
+    Route::get('meetings/{meeting}/calendar.ics', CalendarExportController::class);
+    Route::post('meetings/{meeting}/share-link', [ShareLinkController::class, 'store']);
+    Route::delete('meetings/{meeting}/share-link', [ShareLinkController::class, 'destroy']);
     Route::get('dashboard', [DashboardController::class, 'show']);
     Route::get('users', [TenantUserController::class, 'index']);
     Route::get('invitations', [InvitationController::class, 'inbox']);
