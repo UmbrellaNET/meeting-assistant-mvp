@@ -148,4 +148,9 @@ class Meeting extends Model
 
         return $this;
     }
+
+    public function summary()
+    {
+        return $this->hasOne(MeetingSummary::class);
+    }
 }

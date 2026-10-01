@@ -91,6 +91,7 @@ class ProcessMeetingArtifact implements ShouldQueue
                 $artifact->update(['status'=>'processed']);
                 $meeting->update(['status'=>'ready','processing_status'=>'completed']);
                 $job->update(['status'=>'completed','completed_at'=>now(),'output_transcript_version_id'=>$version->id]);
+                \App\Jobs\GenerateMeetingSummary::dispatch($meeting->id);
             });
         } catch (\Throwable $e) {
             $artifact->update(['status'=>'failed']);

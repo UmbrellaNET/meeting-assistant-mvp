@@ -3,10 +3,11 @@
 import { FormEvent, use, useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { MediaPlayer } from '@/components/MediaPlayer';
+import { MeetingSummaryView } from '@/components/MeetingSummaryView';
 import { ParticipationBadge } from '@/components/ParticipationBadge';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TranscriptViewer } from '@/components/TranscriptViewer';
-import { api } from '@/lib/api';
+import { api, getMeetingSummary } from '@/lib/api';
 import {
   excludeExistingParticipants,
   participantEmail,
@@ -14,7 +15,7 @@ import {
   unwrapList,
 } from '@/lib/lists';
 import { isMeetingConvenor } from '@/lib/rbac';
-import type { Meeting, MeetingParticipant, TenantUser } from '@/lib/types';
+import type { Meeting, MeetingParticipant, MeetingSummary, TenantUser } from '@/lib/types';
 
 async function fetchTenantUsers(): Promise<TenantUser[]> {
   try {
@@ -25,6 +26,17 @@ async function fetchTenantUsers(): Promise<TenantUser[]> {
     } catch {
       return [];
     }
+  }
+}
+
+async function fetchSummary(meetingId: string): Promise<MeetingSummary> {
+  try {
+    const result = await getMeetingSummary(meetingId);
+    const status = (result as { status?: string } | null)?.status;
+    // Only accept real summaries; ignore `{}` or `{ status: 'pending' }`.
+    return status === 'completed' || status === 'failed' ? result : null;
+  } catch {
+    return null;
   }
 }
 
@@ -39,14 +51,17 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
   const [uploading, setUploading] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [artifactType, setArtifactType] = useState('uploaded_transcript');
+  const [summary, setSummary] = useState<MeetingSummary>(null);
 
   const load = useCallback(async () => {
     const next = await api<Meeting>(`/meetings/${id}`);
     setMeeting(next);
+    void fetchSummary(id).then(setSummary);
     if (next.participants?.length) {
       setParticipants(next.participants);
       return next;
     }
+
     try {
       setParticipants(unwrapList<MeetingParticipant>(await api(`/meetings/${id}/participants`)));
     } catch {
@@ -252,6 +267,23 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
           <MediaPlayer meetingId={meeting.id} artifactId={recording.id} type={recording.artifact_type as 'audio' | 'video'} />
         </section>
       ) : null}
+
+      <section className="panel summary-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Meeting Notes</h2>
+            <p>AI-generated summary from the transcript.</p>
+          </div>
+        </div>
+        {summary ? (
+          <MeetingSummaryView summary={summary} />
+        ) : (
+          <div className="empty-state">
+            <h3>Notes not ready</h3>
+            <p>Notes generate automatically once the transcript finishes processing.</p>
+          </div>
+        )}
+      </section>
 
       <section className="panel transcript-panel">
         <div className="panel-heading">

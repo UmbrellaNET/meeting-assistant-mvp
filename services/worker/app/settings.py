@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     transcription_backend: str = 'mock'
     openai_api_key: str | None = None
     openai_transcription_model: str = 'gpt-4o-transcribe-diarize'
+    gemini_api_key: str | None = None
+    gemini_model: str = 'gemini-3.8-flash'
     internal_shared_secret: str = 'change-this-internal-secret'
     max_download_bytes: int = 600 * 1024 * 1024
 

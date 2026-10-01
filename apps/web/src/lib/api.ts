@@ -1,3 +1,5 @@
+import { MeetingSummary } from "./types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
 export class ApiError extends Error {
@@ -115,4 +117,12 @@ export function formatTime(ms: number): string {
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
   return hours > 0 ? `${hours}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}` : `${minutes}:${String(seconds).padStart(2,'0')}`;
+}
+
+export async function getMeetingSummary(meetingId: string): Promise<MeetingSummary> {
+  return api<MeetingSummary>(`/meetings/${meetingId}/summary`);
+}
+
+export async function regenerateMeetingSummary(meetingId: string): Promise<void> {
+  await api<void>(`/meetings/${meetingId}/summary/regenerate`, { method: 'POST' });
 }

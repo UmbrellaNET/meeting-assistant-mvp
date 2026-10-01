@@ -25,3 +25,33 @@ class TranscriptionResponse(BaseModel):
     duration_ms: int | None = None
     segments: list[Segment]
     warnings: list[str] = Field(default_factory=list)
+
+class SummaryTopic(BaseModel):
+    topic: str
+    owner: str | None = None
+    summary: str
+    outcome: str
+
+class SummaryActionItem(BaseModel):
+    owner: str
+    action: str
+    context: str | None = None
+    when: str | None = None
+    priority: str | None = None
+
+class SummarizeRequest(BaseModel):
+    meeting_id: str
+    title: str
+    date: str | None = None
+    attendees: list[str] = []
+    transcript_text: str
+
+class SummarizeResponse(BaseModel):
+    executive_summary: str
+    quick_summary: list[str]
+    decisions: list[str]
+    topics: list[SummaryTopic]
+    action_items: list[SummaryActionItem]
+    risks: list[str]
+    dependencies: list[str]
+    unknowns: list[str]    

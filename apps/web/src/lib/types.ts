@@ -177,3 +177,33 @@ export type DashboardPayload = {
 };
 
 export type Paginated<T> = { data: T[]; current_page: number; last_page: number; total: number };
+
+export type MeetingSummaryTopic = {
+  topic: string;
+  owner?: string | null;
+  summary: string;
+  outcome: string;
+};
+
+export type MeetingSummaryActionItem = {
+  owner: string;
+  action: string;
+  context?: string;
+  when?: string;
+  priority?: string;
+};
+
+export type MeetingSummary = {
+  id: string;
+  meeting_id: string;
+  executive_summary: string | null;
+  quick_summary: string[];
+  decisions: string[];
+  topics: MeetingSummaryTopic[];
+  action_items: MeetingSummaryActionItem[];
+  risks: string[];
+  dependencies: string[];
+  unknowns: string[];
+  status: 'completed' | 'failed';
+  error_message: string | null;
+} | null;

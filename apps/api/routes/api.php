@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\CalendarExportController;
 use App\Http\Controllers\Api\PublicCalendarExportController;
 use App\Http\Controllers\Api\ShareLinkController;
+use App\Http\Controllers\Api\MeetingSummaryController;
 
 Route::prefix('auth')->group(function (): void {
     Route::post('register', [AuthController::class, 'register']);
@@ -44,6 +45,9 @@ Route::middleware('api.token')->group(function (): void {
     Route::get('dashboard', [DashboardController::class, 'show']);
     Route::get('users', [TenantUserController::class, 'index']);
     Route::get('invitations', [InvitationController::class, 'inbox']);
+
+    Route::get('meetings/{meeting}/summary', [MeetingSummaryController::class, 'show']);
+    Route::post('meetings/{meeting}/summary/regenerate', [MeetingSummaryController::class, 'regenerate']);
 
     Route::apiResource('meetings', MeetingController::class)->only(['index', 'store', 'show', 'destroy']);
     Route::post('meetings/{meeting}/invitations', [InvitationController::class, 'store']);
