@@ -1,0 +1,39 @@
+
+FROM dunglas/frankenphp:1-php8.4-alpine
+
+RUN install-php-extensions \
+    pdo_pgsql \
+    pcntl \
+    mbstring \
+    bcmath \
+    intl \
+    opcache \
+    zip \
+    curl \
+    dom \
+    xml
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+COPY . .
+
+RUN composer install \
+    --no-dev \
+    --prefer-dist \
+    --no-interaction \
+    --optimize-autoloader \
+    --no-progress \
+    && mkdir -p \
+       storage/framework/cache/data \
+       storage/framework/sessions \
+       storage/framework/views \
+       storage/logs \
+       bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+ENV APP_ENV=production
+ENV APP_DEBUG=false
+
+CMD ["sh", "-c", "frankenphp php-server --root public --listen :${PORT:-80}"]
