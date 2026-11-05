@@ -15,4 +15,4 @@ COPY docker/php.ini /usr/local/etc/php/conf.d/meeting-intelligence.ini
 RUN mkdir -p storage/framework/{cache/data,sessions,views} storage/logs bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 EXPOSE 8000
-CMD ["sh", "/var/www/html/docker/start-api.sh"]
+CMD ["sh", "-c", "php artisan migrate --force && php artisan db:seed --force && (while true; do php artisan queue:work --sleep=3 --tries=3 --timeout=600; sleep 2; done &) && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
