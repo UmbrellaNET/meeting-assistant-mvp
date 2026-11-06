@@ -20,10 +20,17 @@ class ProcessMeetingArtifact implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    // These class values override the --tries/--backoff flags on `queue:work`.
+    public int $tries = 6;
     public int $timeout = 900;
 
     public function __construct(public readonly string $artifactId) {}
+
+    /** Seconds to wait between attempts when the job throws (gives a sleeping worker time to wake). */
+    public function backoff(): array
+    {
+        return [30, 60, 120, 240, 300];
+    }
 
     public function handle(): void
     {
@@ -40,6 +47,7 @@ class ProcessMeetingArtifact implements ShouldQueue
             $sourceUrl = Storage::disk($artifact->storage_disk)->temporaryUrl($artifact->storage_key, now()->addMinutes(30));
 
             $response = Http::acceptJson()
+                ->withUserAgent('MeetingAssistant-API/1.0')
                 ->withHeader('X-Internal-Secret', (string) config('services.ai_worker.secret'))
                 ->timeout(850)
                 ->post(rtrim((string) config('services.ai_worker.url'), '/').'/v1/transcribe', [
@@ -52,8 +60,26 @@ class ProcessMeetingArtifact implements ShouldQueue
                     'language'=>'en',
                 ]);
 
+            // Temporary problems (rate limit, worker waking up, gateway errors): wait and retry
+            // instead of marking the meeting as failed.
+            $retryable = in_array($response->status(), [429, 502, 503, 504], true);
+            if ($retryable && $this->attempts() < $this->tries) {
+                $delay = (int) ($response->header('Retry-After') ?: 0);
+                if ($delay < 1) {
+                    $delay = [30, 60, 120, 240, 300][min($this->attempts() - 1, 4)];
+                }
+                $job->update([
+                    'status'=>'failed','completed_at'=>now(),'error_code'=>'WorkerBusy',
+                    'error_message'=>'AI worker returned '.$response->status().'; retrying in '.$delay.'s',
+                ]);
+                $artifact->update(['status'=>'stored']);
+                $meeting->update(['status'=>'artifact_received','processing_status'=>'queued']);
+                $this->release($delay);
+                return;
+            }
+
             if (!$response->successful()) {
-                throw new RuntimeException('AI worker failed: '.$response->status().' '.$response->body());
+                throw new RuntimeException('AI worker failed: '.$response->status().' '.mb_substr($response->body(), 0, 500));
             }
 
             $payload = $response->json();
