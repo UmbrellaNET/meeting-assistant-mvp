@@ -459,7 +459,9 @@ pre,code{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
 }
 
 .detail-grid{align-items:stretch}
-.detail-grid>*{margin-top:0;align-self:stretch}
+.detail-grid>*, 
+.detail-grid>.panel, 
+.detail-grid>.panel + .panel{margin-top:0;align-self:stretch}
 .detail-grid>.panel{height:auto}
 
 /* if a column is a wrapper div holding the panel(s), make the panel fill it */
