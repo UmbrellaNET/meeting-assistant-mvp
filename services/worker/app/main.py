@@ -4,6 +4,7 @@ import asyncio
 import hmac
 import json
 import logging
+import os
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -37,7 +38,11 @@ async def verify_internal_secret(x_internal_secret: str = Header(default='')) ->
 
 @app.get('/health')
 def health() -> dict:
-    return {'status': 'ok', 'backend': settings.transcription_backend}
+    return {
+        'status': 'ok',
+        'backend': settings.transcription_backend,
+        'summary_backend': _summary_backend(),
+    }
 
 
 @app.post('/v1/transcribe', response_model=TranscriptionResponse, dependencies=[Depends(verify_internal_secret)])
@@ -147,16 +152,35 @@ Return ONLY valid JSON matching this exact shape, no prose outside the JSON:
 Base everything strictly on the transcript content. If a section has nothing to report, return an empty array for it (never omit the key)."""
 
 
-@app.post('/v1/summarize', response_model=SummarizeResponse, dependencies=[Depends(verify_internal_secret)])
-async def summarize(request: SummarizeRequest) -> SummarizeResponse:
-    client = get_gemini_client()
-    user_prompt = (
-        f"Meeting title: {request.title}\n"
-        f"Date: {request.date or 'unknown'}\n"
-        f"Attendees: {', '.join(request.attendees) if request.attendees else 'unknown'}\n\n"
-        f"Transcript:\n{request.transcript_text}"
-    )
+OPENAI_STYLE_BACKENDS = {'openai', 'openai_compatible', 'vllm', 'hf', 'huggingface', 'open'}
 
+
+def _summary_backend() -> str:
+    """'gemini' (default) or an OpenAI-compatible server such as vLLM / HF Inference Endpoints."""
+    return os.getenv('SUMMARY_BACKEND', 'gemini').strip().lower()
+
+
+def _clean_model_text(text: str) -> str:
+    """Reduce a model reply to a bare JSON object string."""
+    text = (text or '').strip()
+    # Gemma 4 can emit an (empty) thinking block: <|channel>thought\n...<channel|>final answer
+    if '<channel|>' in text:
+        text = text.rsplit('<channel|>', 1)[1].strip()
+    # Defensive: strip markdown fences if the model adds them
+    if text.startswith('```'):
+        text = text.strip('`').removeprefix('json').strip()
+    start, end = text.find('{'), text.rfind('}')
+    if start != -1 and end > start:
+        text = text[start:end + 1]
+    return text
+
+
+def _retryable_status(status: int) -> bool:
+    return status in (429, 502, 503, 504)
+
+
+async def _summarize_gemini(user_prompt: str) -> str:
+    client = get_gemini_client()
     try:
         response = await client.aio.models.generate_content(
             model=settings.gemini_model,
@@ -178,13 +202,82 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
                 headers={'Retry-After': '60'},
             )
         raise HTTPException(status_code=502, detail=f'Gemini request failed: {exc}')
+    return response.text or ''
+
+
+async def _summarize_openai_compatible(user_prompt: str) -> str:
+    """Call any OpenAI-compatible chat endpoint (vLLM, HF Inference Endpoints, Together, RunPod, ...).
+
+    Env vars: LLM_BASE_URL (include /v1), LLM_MODEL, LLM_API_KEY (optional), LLM_TEMPERATURE (optional).
+    """
+    base_url = os.getenv('LLM_BASE_URL', '').strip().rstrip('/')
+    model = os.getenv('LLM_MODEL', '').strip()
+    if not base_url or not model:
+        raise HTTPException(status_code=500, detail='LLM_BASE_URL and LLM_MODEL must be set when SUMMARY_BACKEND is not gemini.')
+
+    headers = {'Content-Type': 'application/json'}
+    api_key = os.getenv('LLM_API_KEY', '').strip()
+    if api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
+
+    payload: dict = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': SUMMARY_SYSTEM_PROMPT},
+            {'role': 'user', 'content': user_prompt},
+        ],
+        'temperature': float(os.getenv('LLM_TEMPERATURE', '0.3')),
+        'top_p': 0.95,
+        'max_tokens': int(os.getenv('LLM_MAX_TOKENS', '4096')),
+        'response_format': {'type': 'json_object'},
+    }
+    url = f'{base_url}/chat/completions'
 
     try:
-        text = (response.text or '').strip()
-        # Defensive: strip markdown fences if the model adds them
-        if text.startswith('```'):
-            text = text.strip('`').removeprefix('json').strip()
-        data = json.loads(text)
+        # GPU endpoints can take minutes to cold start, so use a long timeout.
+        async with httpx.AsyncClient(timeout=600) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 400 and 'response_format' in payload:
+                # Some servers do not support response_format; retry without it.
+                payload.pop('response_format')
+                resp = await client.post(url, json=payload, headers=headers)
+    except httpx.HTTPError as exc:
+        logger.warning('LLM request error: %s', exc)
+        raise HTTPException(status_code=503, detail=f'LLM endpoint unreachable: {exc.__class__.__name__}: {exc}', headers={'Retry-After': '60'})
+
+    if resp.status_code >= 400:
+        logger.warning('LLM endpoint returned HTTP %s: %s', resp.status_code, resp.text[:300])
+        code = 503 if _retryable_status(resp.status_code) else 502
+        raise HTTPException(
+            status_code=code,
+            detail=f'LLM endpoint failed: HTTP {resp.status_code} {resp.text[:300]}',
+            headers={'Retry-After': '60'} if code == 503 else None,
+        )
+
+    try:
+        return resp.json()['choices'][0]['message']['content'] or ''
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f'Unexpected LLM response format: {exc}')
+
+
+@app.post('/v1/summarize', response_model=SummarizeResponse, dependencies=[Depends(verify_internal_secret)])
+async def summarize(request: SummarizeRequest) -> SummarizeResponse:
+    user_prompt = (
+        f"Meeting title: {request.title}\n"
+        f"Date: {request.date or 'unknown'}\n"
+        f"Attendees: {', '.join(request.attendees) if request.attendees else 'unknown'}\n\n"
+        f"Transcript:\n{request.transcript_text}"
+    )
+
+    backend = _summary_backend()
+    logger.info('summarize via %s (%d chars of transcript)', backend, len(request.transcript_text or ''))
+    if backend in OPENAI_STYLE_BACKENDS:
+        text = await _summarize_openai_compatible(user_prompt)
+    else:
+        text = await _summarize_gemini(user_prompt)
+
+    try:
+        data = json.loads(_clean_model_text(text))
         return SummarizeResponse(**data)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f'Failed to parse summary: {exc}')
