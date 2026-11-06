@@ -260,6 +260,81 @@ async def _summarize_openai_compatible(user_prompt: str) -> str:
         raise HTTPException(status_code=502, detail=f'Unexpected LLM response format: {exc}')
 
 
+_gradio_client = None
+
+
+def _get_gradio_client():
+    global _gradio_client
+    if _gradio_client is None:
+        try:
+            from gradio_client import Client
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail='gradio_client is not installed on the worker (add gradio_client to its requirements).',
+            ) from exc
+        url = os.getenv('GRADIO_SPACE_URL', 'https://tarirozw-gemma4.hf.space').strip()
+        token = os.getenv('HF_TOKEN', '').strip()
+        try:
+            _gradio_client = Client(url, hf_token=token) if token else Client(url)
+        except TypeError:
+            # newer gradio_client versions renamed the argument
+            _gradio_client = Client(url, token=token) if token else Client(url)
+    return _gradio_client
+
+
+def _gradio_result_to_text(result) -> str:
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        return str(result.get('content') or result.get('text') or '')
+    if isinstance(result, (list, tuple)):
+        for item in reversed(result):
+            text = _gradio_result_to_text(item)
+            if text:
+                return text
+        return ''
+    return str(result or '')
+
+
+def _gradio_predict(prompt: str) -> str:
+    """Blocking call to a Hugging Face Gradio Space (run it in a thread)."""
+    client = _get_gradio_client()
+    api_name = os.getenv('GRADIO_API_NAME', '/chat')
+    prompt_param = os.getenv('GRADIO_PROMPT_PARAM', 'message')
+    extra = json.loads(os.getenv('GRADIO_EXTRA_KWARGS', '') or '{}')
+    job = client.submit(api_name=api_name, **{prompt_param: prompt}, **extra)
+    return _gradio_result_to_text(job.result(timeout=600))
+
+
+async def _summarize_gradio(user_prompt: str) -> str:
+    """Summaries from a Gradio Space (for example a small open model such as Gemma 4 E4B).
+
+    Env vars: GRADIO_SPACE_URL, GRADIO_API_NAME (default /chat), GRADIO_PROMPT_PARAM (default message),
+    GRADIO_EXTRA_KWARGS (JSON, e.g. {"max_new_tokens": 4096}), HF_TOKEN (private Spaces / higher quota).
+    """
+    prompt = f"{SUMMARY_SYSTEM_PROMPT}\n\n---\n\n{user_prompt}"
+    try:
+        return await asyncio.to_thread(_gradio_predict, prompt)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        message = str(exc)
+        logger.warning('Gradio Space request failed: %s: %s', exc.__class__.__name__, message[:300])
+        # A wrong endpoint or parameter name will not fix itself: do not retry.
+        if 'api_name' in message or 'Cannot find a function' in message or 'unexpected keyword' in message:
+            raise HTTPException(
+                status_code=502,
+                detail=f'Gradio endpoint/parameter mismatch (check GRADIO_API_NAME / GRADIO_PROMPT_PARAM): {message[:300]}',
+            )
+        # Sleeping Space, queue full or GPU quota: temporary, so ask the API to retry later.
+        raise HTTPException(
+            status_code=503,
+            detail=f'Gradio Space request failed: {exc.__class__.__name__}: {message[:300]}',
+            headers={'Retry-After': '90'},
+        )
+
+
 @app.post('/v1/summarize', response_model=SummarizeResponse, dependencies=[Depends(verify_internal_secret)])
 async def summarize(request: SummarizeRequest) -> SummarizeResponse:
     user_prompt = (
@@ -273,6 +348,13 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
     logger.info('summarize via %s (%d chars of transcript)', backend, len(request.transcript_text or ''))
     if backend in OPENAI_STYLE_BACKENDS:
         text = await _summarize_openai_compatible(user_prompt)
+    elif backend == 'gradio':
+        text = await _summarize_gradio(user_prompt)
+        # Small models sometimes break the JSON format: retry once with a stricter reminder.
+        try:
+            json.loads(_clean_model_text(text))
+        except Exception:
+            text = await _summarize_gradio(user_prompt + '\n\nIMPORTANT: reply with ONLY the JSON object, nothing else.')
     else:
         text = await _summarize_gemini(user_prompt)
 
