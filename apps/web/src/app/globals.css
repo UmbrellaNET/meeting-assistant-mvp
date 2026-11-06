@@ -404,3 +404,53 @@ button.data-table-row{width:100%;border:0;background:transparent;font:inherit;co
   .data-table-row > :first-child{grid-column:1/-1}
   .modal-overlay{padding:16px;align-items:end}
 }
+
+/* ===== Responsive fixes: paste at the VERY END of your global stylesheet ===== */
+
+/* 1. Let grid/flex children shrink instead of forcing the page wider */
+html,body{max-width:100%;overflow-x:hidden}
+.shell-column,.main-content,.panel,.metric,.data-table{min-width:0}
+.detail-grid{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.detail-grid>*,.calendar-layout>*{min-width:0}
+.panel-heading{flex-wrap:wrap}
+.panel-heading>*{min-width:0}
+.process-state{flex-wrap:wrap;gap:10px}
+.upload-box{grid-template-columns:160px minmax(0,1fr) auto}
+.upload-box>*{min-width:0}
+.artifact-card{grid-template-columns:auto minmax(0,1fr) auto}
+.artifact-card>div:nth-child(2){min-width:0}
+.transcript-segment{grid-template-columns:74px minmax(0,1fr)}
+.speaker-row,.participant-row{flex-wrap:wrap}
+
+/* 2. Long filenames, URLs, transcript text and error messages wrap */
+.artifact-card strong,.artifact-card small,.job-list>div,.job-list .error-text,
+.segment-body p,.activity-detail dd,.participant-row small,.workspace-row small,
+.data-table-row strong,.data-table-row small{overflow-wrap:anywhere}
+pre,code{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+
+/* 3. Media never exceeds its container */
+.media-player,.media-player audio,.media-player video,
+.panel img,.panel video,.panel iframe{max-width:100%}
+.panel img,.panel iframe{height:auto}
+
+/* 4. Tablet and below: single column */
+@media(max-width:1000px){
+  .detail-grid,.calendar-layout{grid-template-columns:minmax(0,1fr)}
+  .upload-box{grid-template-columns:minmax(0,1fr)}
+}
+
+/* 5. Phone */
+@media(max-width:680px){
+  .main-content{padding:16px}
+  .panel,.data-table{padding:16px}
+  .page-header{gap:12px}
+  .page-header-actions{justify-content:flex-start;flex-wrap:wrap}
+  .transcript-segment{grid-template-columns:52px minmax(0,1fr);gap:10px}
+  .artifact-card{grid-template-columns:auto minmax(0,1fr)}
+  .artifact-card>:last-child{grid-column:1/-1}
+  .job-list>div{flex-wrap:wrap}
+  .form-actions>*{flex:1 1 auto}
+  .data-table-row>*{min-width:0}
+  .data-table-row>:last-child{grid-column:1/-1}
+  .data-table-actions{justify-content:flex-start;flex-wrap:wrap}
+}
