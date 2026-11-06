@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import hmac
 import json
+import logging
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -24,6 +26,9 @@ from .settings import settings
 
 app = FastAPI(title='Meeting Intelligence AI Worker', version='0.1.0')
 
+# "uvicorn.error" is configured by uvicorn, so these lines show up in Render's logs.
+logger = logging.getLogger('uvicorn.error')
+
 
 async def verify_internal_secret(x_internal_secret: str = Header(default='')) -> None:
     if not hmac.compare_digest(x_internal_secret, settings.internal_shared_secret):
@@ -37,19 +42,48 @@ def health() -> dict:
 
 @app.post('/v1/transcribe', response_model=TranscriptionResponse, dependencies=[Depends(verify_internal_secret)])
 async def transcribe(request: TranscriptionRequest) -> TranscriptionResponse:
+    source_host = urlparse(str(request.source_url)).netloc
+    logger.info(
+        'transcribe received meeting=%s artifact=%s file=%s type=%s source_host=%s',
+        getattr(request, 'meeting_id', None),
+        getattr(request, 'artifact_id', None),
+        request.filename,
+        getattr(request, 'artifact_type', None),
+        source_host,
+    )
+
     suffix = Path(request.filename or urlparse(str(request.source_url)).path).suffix.lower() or '.bin'
     with tempfile.TemporaryDirectory(prefix='meeting-artifact-') as tmp:
         path = Path(tmp) / f'source{suffix}'
         total = 0
-        async with httpx.AsyncClient(follow_redirects=True, timeout=840) as client:
-            async with client.stream('GET', str(request.source_url)) as response:
-                response.raise_for_status()
-                with path.open('wb') as handle:
-                    async for chunk in response.aiter_bytes():
-                        total += len(chunk)
-                        if total > settings.max_download_bytes:
-                            raise HTTPException(status_code=413, detail='Artifact exceeds worker download limit.')
-                        handle.write(chunk)
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=840) as client:
+                async with client.stream('GET', str(request.source_url)) as response:
+                    response.raise_for_status()
+                    with path.open('wb') as handle:
+                        async for chunk in response.aiter_bytes():
+                            total += len(chunk)
+                            if total > settings.max_download_bytes:
+                                raise HTTPException(status_code=413, detail='Artifact exceeds worker download limit.')
+                            handle.write(chunk)
+        except HTTPException:
+            raise
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            logger.warning('source download failed: HTTP %s from %s', status, source_host)
+            # Rate limits / gateway errors on the source are temporary: report 503 so the API retries.
+            code = 503 if status in (429, 502, 503, 504) else 502
+            raise HTTPException(
+                status_code=code,
+                detail=f'Could not download source file from {source_host}: HTTP {status}',
+                headers={'Retry-After': '60'} if code == 503 else None,
+            ) from exc
+        except httpx.HTTPError as exc:
+            logger.warning('source download error from %s: %s', source_host, exc)
+            raise HTTPException(
+                status_code=502,
+                detail=f'Could not download source file from {source_host}: {exc.__class__.__name__}: {exc}',
+            ) from exc
 
         warnings: list[str] = []
         provider = 'source-parser'
@@ -59,11 +93,13 @@ async def transcribe(request: TranscriptionRequest) -> TranscriptionResponse:
         elif suffix in {'.txt', '.md'}:
             segments = parse_plain_text(path)
         else:
-            segments, model, warnings = get_backend().transcribe(path, request.language)
+            # Run the blocking transcription in a thread so /health and other requests keep responding.
+            segments, model, warnings = await asyncio.to_thread(get_backend().transcribe, path, request.language)
             provider = settings.transcription_backend
 
         if not segments:
             raise HTTPException(status_code=422, detail='No transcript segments were produced.')
+        logger.info('transcribe done: %d segments via %s', len(segments), provider)
         return TranscriptionResponse(
             provider=provider,
             model=model,
@@ -132,6 +168,15 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
             ),
         )
     except Exception as exc:
+        message = str(exc)
+        logger.warning('Gemini request failed: %s', message[:300])
+        # Gemini quota / overload errors are temporary: report 503 so the API retries later.
+        if '429' in message or 'RESOURCE_EXHAUSTED' in message or '503' in message or 'UNAVAILABLE' in message:
+            raise HTTPException(
+                status_code=503,
+                detail=f'Gemini is rate limited or overloaded: {message[:300]}',
+                headers={'Retry-After': '60'},
+            )
         raise HTTPException(status_code=502, detail=f'Gemini request failed: {exc}')
 
     try:
