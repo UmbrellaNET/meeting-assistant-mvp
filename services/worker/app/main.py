@@ -313,7 +313,12 @@ async def _summarize_gradio(user_prompt: str) -> str:
     Env vars: GRADIO_SPACE_URL, GRADIO_API_NAME (default /chat), GRADIO_PROMPT_PARAM (default message),
     GRADIO_EXTRA_KWARGS (JSON, e.g. {"max_new_tokens": 4096}), HF_TOKEN (private Spaces / higher quota).
     """
-    prompt = f"{SUMMARY_SYSTEM_PROMPT}\n\n---\n\n{user_prompt}"
+    # Small models with a limited output budget need a shorter target, or the JSON gets cut off.
+    concise = (
+        "\n\nBe concise so the whole JSON fits in a short reply: at most 6 items in quick_summary, "
+        "at most 8 action_items, at most 5 topics, and keep every summary field under 40 words."
+    )
+    prompt = f"{SUMMARY_SYSTEM_PROMPT}{concise}\n\n---\n\n{user_prompt}"
     try:
         return await asyncio.to_thread(_gradio_predict, prompt)
     except HTTPException:
@@ -345,21 +350,36 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
     )
 
     backend = _summary_backend()
+    fallback = os.getenv('SUMMARY_FALLBACK', '').strip().lower()
     logger.info('summarize via %s (%d chars of transcript)', backend, len(request.transcript_text or ''))
-    if backend in OPENAI_STYLE_BACKENDS:
-        text = await _summarize_openai_compatible(user_prompt)
-    elif backend == 'gradio':
-        text = await _summarize_gradio(user_prompt)
-        # Small models sometimes break the JSON format: retry once with a stricter reminder.
-        try:
-            json.loads(_clean_model_text(text))
-        except Exception:
-            text = await _summarize_gradio(user_prompt + '\n\nIMPORTANT: reply with ONLY the JSON object, nothing else.')
-    else:
-        text = await _summarize_gemini(user_prompt)
 
+    text = ''
     try:
-        data = json.loads(_clean_model_text(text))
-        return SummarizeResponse(**data)
+        if backend in OPENAI_STYLE_BACKENDS:
+            text = await _summarize_openai_compatible(user_prompt)
+        elif backend == 'gradio':
+            text = await _summarize_gradio(user_prompt)
+            # Small models sometimes break the JSON format: retry once with a stricter reminder.
+            try:
+                json.loads(_clean_model_text(text))
+            except Exception:
+                text = await _summarize_gradio(user_prompt + '\n\nIMPORTANT: reply with ONLY the JSON object, nothing else.')
+        else:
+            text = await _summarize_gemini(user_prompt)
+        return SummarizeResponse(**json.loads(_clean_model_text(text)))
     except Exception as exc:
+        reason = exc.detail if isinstance(exc, HTTPException) else f'{exc.__class__.__name__}: {exc}'
+        # Optional safety net: if the primary backend fails (quota, sleeping Space, bad JSON), use Gemini.
+        if fallback == 'gemini' and backend != 'gemini':
+            logger.warning('summary via %s failed (%s); falling back to Gemini', backend, str(reason)[:300])
+            text = await _summarize_gemini(user_prompt)  # raises its own HTTPException on failure
+            try:
+                return SummarizeResponse(**json.loads(_clean_model_text(text)))
+            except Exception as exc2:
+                logger.warning('fallback summary parse failed: %s | tail=%r', exc2, (text or '')[-120:])
+                raise HTTPException(status_code=502, detail=f'Failed to parse summary: {exc2}')
+        if isinstance(exc, HTTPException):
+            raise
+        # Log the size and the end of the reply: a reply that stops mid-string means the output limit was hit.
+        logger.warning('summary parse failed: %s | reply length=%d tail=%r', exc, len(text or ''), (text or '')[-120:])
         raise HTTPException(status_code=502, detail=f'Failed to parse summary: {exc}')
