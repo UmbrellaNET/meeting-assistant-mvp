@@ -7,3 +7,4 @@ python-multipart>=0.0.12,<1.0
 pytest>=8.3,<9.0
 openai>=1.0,<2.0
 google-genai
+gradio_client
