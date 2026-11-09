@@ -42,6 +42,7 @@ def health() -> dict:
         'status': 'ok',
         'backend': settings.transcription_backend,
         'summary_backend': _summary_backend(),
+        'summary_fallback': os.getenv('SUMMARY_FALLBACK', '').strip().lower() or None,
     }
 
 
