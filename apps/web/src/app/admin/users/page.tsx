@@ -27,6 +27,7 @@ export default function UserManagementPage() {
   const [active, setActive] = useState<TenantUser | null>(null);
   const [deleting, setDeleting] = useState<TenantUser | null>(null);
   const [impersonating, setImpersonating] = useState<TenantUser | null>(null);
+  const [emailView, setEmailView] = useState<TenantUser | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -67,6 +68,16 @@ export default function UserManagementPage() {
 
   const close = () => {
     if (!busy) setMode(null);
+  };
+
+  const copyEmail = async () => {
+    if (!emailView) return;
+    try {
+      await navigator.clipboard.writeText(emailView.email);
+      toast.success('Email copied to clipboard.');
+    } catch {
+      toast.error('Unable to copy email');
+    }
   };
 
   const submit = async (event: FormEvent) => {
@@ -144,7 +155,7 @@ export default function UserManagementPage() {
           { key: 'role', label: 'Role' },
           { key: 'actions', label: '' },
         ]}
-        cols="minmax(0,1.6fr) minmax(0,1.6fr) minmax(0,1fr) 168px"
+        cols="minmax(0,1.4fr) minmax(0,2fr) minmax(7rem,1fr) 168px"
         search
         searchPlaceholder="Search people"
         loading={users === null && !error}
@@ -157,7 +168,15 @@ export default function UserManagementPage() {
           searchText: `${person.name} ${person.email} ${person.roles?.join(' ') ?? ''}`,
           cells: [
             <strong key="name">{person.name}</strong>,
-            person.email,
+            <button
+              key="email"
+              type="button"
+              className="cell-ellipsis"
+              title={person.email}
+              onClick={() => setEmailView(person)}
+            >
+              {person.email}
+            </button>,
             formatRole(person.roles?.[0] ?? 'user'),
             <TableActions key="actions">
               <IconButton name="view" label="View User" onClick={() => openView(person)} />
@@ -259,6 +278,25 @@ export default function UserManagementPage() {
             </label>
           </form>
         )}
+      </Modal>
+
+      <Modal
+        open={Boolean(emailView)}
+        onClose={() => setEmailView(null)}
+        title="Email address"
+        description={emailView?.name}
+        footer={
+          <>
+            <button type="button" className="secondary-button" onClick={() => void copyEmail()}>
+              Copy
+            </button>
+            <button type="button" className="primary-button" onClick={() => setEmailView(null)}>
+              Close
+            </button>
+          </>
+        }
+      >
+        {emailView ? <div className="full-value">{emailView.email}</div> : null}
       </Modal>
 
       <ConfirmDialog
