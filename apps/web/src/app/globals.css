@@ -467,3 +467,9 @@ pre,code{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
 /* if a column is a wrapper div holding the panel(s), make the panel fill it */
 .detail-grid>div{display:flex;flex-direction:column;gap:20px}
 .detail-grid>div>.panel{margin-top:0;flex:1}
+
+/* Email cell: single line with an ellipsis; click opens the full address */
+.cell-ellipsis{display:block;width:100%;min-width:0;padding:0;border:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell-ellipsis:hover{color:var(--primary-hover);text-decoration:underline}
+.cell-ellipsis:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:6px}
+.full-value{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--primary-soft);font-weight:650;word-break:break-all;user-select:all}
