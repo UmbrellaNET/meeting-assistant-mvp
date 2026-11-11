@@ -473,3 +473,30 @@ pre,code{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
 .cell-ellipsis:hover{color:var(--primary-hover);text-decoration:underline}
 .cell-ellipsis:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:6px}
 .full-value{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--primary-soft);font-weight:650;word-break:break-all;user-select:all}
+
+
+.action-items .panel-heading{flex-wrap:wrap}
+.action-items .filter-row{margin-bottom:0}
+.action-add{display:grid;grid-template-columns:minmax(0,1fr) 190px 160px auto;gap:10px;margin-bottom:12px}
+.action-list{display:grid}
+.action-row{display:grid;grid-template-columns:auto minmax(0,1fr) 190px 150px 130px 76px auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
+.action-row:first-child{border-top:0}
+.action-check{width:18px;height:18px;accent-color:var(--primary);cursor:pointer}
+.action-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.action-main strong,.action-main small{overflow-wrap:anywhere}
+.action-main small{color:var(--muted)}
+.action-row.is-closed .action-main strong{text-decoration:line-through;color:var(--muted)}
+.action-add input,.action-add select,.action-row select,.action-row input[type=date]{width:100%;min-width:0;border:1px solid #DED4DB;border-radius:10px;background:#fff;padding:9px 10px;color:var(--ink);outline:none}
+.action-add input:focus,.action-add select:focus,.action-row select:focus,.action-row input[type=date]:focus{border-color:var(--blue);box-shadow:var(--focus-ring)}
+.action-row select:disabled,.action-row input[type=date]:disabled{background:#F6F2F5;color:var(--muted);cursor:default}
+.action-row input.is-overdue{border-color:var(--red);color:var(--red)}
+.priority-pill{display:inline-flex;justify-content:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800;text-transform:capitalize;background:#F0EBEF;color:#5A5460}
+.priority-high{background:#fde9eb;color:var(--red)}
+.priority-medium{background:#fff3dd;color:var(--amber)}
+.priority-low{background:#e5f6ef;color:var(--green)}
+@media(max-width:1000px){
+  .action-add{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .action-add input:first-child{grid-column:1/-1}
+  .action-row{grid-template-columns:auto minmax(0,1fr)}
+  .action-row>:nth-child(n+3){grid-column:1/-1}
+}
