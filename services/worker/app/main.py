@@ -143,12 +143,14 @@ Return ONLY valid JSON matching this exact shape, no prose outside the JSON:
     {"topic": "Topic name", "owner": "Person or null", "summary": "paragraph", "outcome": "Decision|Deferred|No decision"}
   ],
   "action_items": [
-    {"owner": "Name", "action": "what to do", "context": "why", "when": "deadline or timeframe", "priority": "High|Medium|Low"}
+    {"owner": "Name", "action": "what to do", "context": "why", "when": "deadline as said in the meeting, or null", "due_date": "YYYY-MM-DD resolved from the meeting Date, or null", "priority": "High|Medium|Low"}
   ],
   "risks": ["risk description", ...],
   "dependencies": ["dependency description", ...],
   "unknowns": ["open question", ...]
 }
+
+For action items: use the owner's name exactly as it appears in the Attendees list when possible. Work out relative deadlines (Friday, next week, end of the month) from the meeting Date given below and set due_date to the resolved date as YYYY-MM-DD; if the Date is unknown or the deadline is vague, set due_date to null.
 
 Base everything strictly on the transcript content. If a section has nothing to report, return an empty array for it (never omit the key)."""
 
@@ -174,6 +176,14 @@ def _clean_model_text(text: str) -> str:
     if start != -1 and end > start:
         text = text[start:end + 1]
     return text
+
+
+def _parse_summary(text: str) -> SummarizeResponse:
+    """Parse a model reply into a summary; an empty or hollow summary counts as a failure so the retry/fallback runs."""
+    result = SummarizeResponse(**json.loads(_clean_model_text(text)))
+    if not (result.executive_summary or result.quick_summary or result.topics or result.decisions or result.action_items):
+        raise ValueError('The model returned an empty summary.')
+    return result
 
 
 def _retryable_status(status: int) -> bool:
@@ -362,12 +372,12 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
             text = await _summarize_gradio(user_prompt)
             # Small models sometimes break the JSON format: retry once with a stricter reminder.
             try:
-                json.loads(_clean_model_text(text))
+                _parse_summary(text)
             except Exception:
                 text = await _summarize_gradio(user_prompt + '\n\nIMPORTANT: reply with ONLY the JSON object, nothing else.')
         else:
             text = await _summarize_gemini(user_prompt)
-        return SummarizeResponse(**json.loads(_clean_model_text(text)))
+        return _parse_summary(text)
     except Exception as exc:
         reason = exc.detail if isinstance(exc, HTTPException) else f'{exc.__class__.__name__}: {exc}'
         # Optional safety net: if the primary backend fails (quota, sleeping Space, bad JSON), use Gemini.
@@ -375,7 +385,7 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
             logger.warning('summary via %s failed (%s); falling back to Gemini', backend, str(reason)[:300])
             text = await _summarize_gemini(user_prompt)  # raises its own HTTPException on failure
             try:
-                return SummarizeResponse(**json.loads(_clean_model_text(text)))
+                return _parse_summary(text)
             except Exception as exc2:
                 logger.warning('fallback summary parse failed: %s | tail=%r', exc2, (text or '')[-120:])
                 raise HTTPException(status_code=502, detail=f'Failed to parse summary: {exc2}')
