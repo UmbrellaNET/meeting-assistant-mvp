@@ -16,6 +16,7 @@ import {
 } from '@/lib/lists';
 import { isMeetingConvenor } from '@/lib/rbac';
 import type { Meeting, MeetingParticipant, MeetingSummary, TenantUser } from '@/lib/types';
+import { ActionItemsPanel } from '@/components/ActionItemsPanel';
 
 async function fetchTenantUsers(): Promise<TenantUser[]> {
   try {
@@ -282,8 +283,16 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
             <h3>Notes not ready</h3>
             <p>Notes generate automatically once the transcript finishes processing.</p>
           </div>
-        )}
+                )}
       </section>
+
+      <ActionItemsPanel
+        meetingId={meeting.id}
+        participants={participants}
+        canManage={canManage}
+        currentUserId={user?.id}
+        refreshKey={summary?.id}
+      />
 
       <section className="panel transcript-panel">
         <div className="panel-heading">
