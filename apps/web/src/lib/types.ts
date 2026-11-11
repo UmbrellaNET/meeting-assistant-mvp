@@ -207,3 +207,24 @@ export type MeetingSummary = {
   status: 'completed' | 'failed';
   error_message: string | null;
 } | null;
+
+export type ActionItemStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
+export type ActionItemPriority = 'high' | 'medium' | 'low';
+
+export type ActionItem = {
+  id: string;
+  meeting_id: string;
+  title: string;
+  context?: string | null;
+  owner_user_id?: string | null;
+  owner_name?: string | null;
+  due_date?: string | null;
+  due_text?: string | null;
+  status: ActionItemStatus;
+  priority: ActionItemPriority;
+  source: 'ai' | 'manual';
+  external_provider?: string | null;
+  external_url?: string | null;
+  created_at: string;
+  updated_at: string;
+};
