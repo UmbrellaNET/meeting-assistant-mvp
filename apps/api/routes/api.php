@@ -19,6 +19,13 @@ use App\Http\Controllers\Api\CalendarExportController;
 use App\Http\Controllers\Api\PublicCalendarExportController;
 use App\Http\Controllers\Api\ShareLinkController;
 use App\Http\Controllers\Api\MeetingSummaryController;
+use App\Http\Controllers\Api\ActionItemController;
+
+Route::get('/action-items', [ActionItemController::class, 'mine']);
+Route::get('/meetings/{meeting}/action-items', [ActionItemController::class, 'index']);
+Route::post('/meetings/{meeting}/action-items', [ActionItemController::class, 'store']);
+Route::patch('/action-items/{actionItem}', [ActionItemController::class, 'update']);
+Route::delete('/action-items/{actionItem}', [ActionItemController::class, 'destroy']);
 
 Route::prefix('auth')->group(function (): void {
     Route::post('register', [AuthController::class, 'register']);
