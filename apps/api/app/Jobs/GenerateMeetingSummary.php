@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Jobs;
-
+ 
 use App\Models\ActionItem;
 use App\Models\Meeting;
 use App\Models\MeetingSummary;
