@@ -29,14 +29,16 @@ class TranscriptionResponse(BaseModel):
 class SummaryTopic(BaseModel):
     topic: str
     owner: str | None = None
-    summary: str
-    outcome: str
+    # Small models sometimes leave these out; defaults keep one missing field from failing the whole summary.
+    summary: str = ''
+    outcome: str = 'No decision'
 
 class SummaryActionItem(BaseModel):
-    owner: str
+    owner: str | None = None          # was required: a missing owner used to fail the whole summary
     action: str
     context: str | None = None
-    when: str | None = None
+    when: str | None = None           # the deadline as spoken, e.g. "by Friday"
+    due_date: str | None = None       # NEW: the deadline resolved to YYYY-MM-DD, or None
     priority: str | None = None
 
 class SummarizeRequest(BaseModel):
@@ -47,11 +49,12 @@ class SummarizeRequest(BaseModel):
     transcript_text: str
 
 class SummarizeResponse(BaseModel):
-    executive_summary: str
-    quick_summary: list[str]
-    decisions: list[str]
-    topics: list[SummaryTopic]
-    action_items: list[SummaryActionItem]
-    risks: list[str]
-    dependencies: list[str]
-    unknowns: list[str]    
+    # Every section defaults to empty so a model that omits one key still produces a usable summary.
+    executive_summary: str = ''
+    quick_summary: list[str] = Field(default_factory=list)
+    decisions: list[str] = Field(default_factory=list)
+    topics: list[SummaryTopic] = Field(default_factory=list)
+    action_items: list[SummaryActionItem] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
