@@ -1,6 +1,8 @@
 'use client';
 
+// Save as: app/meetings/[id]/page.tsx  (this file replaces the existing meeting detail page)
 import { FormEvent, use, useCallback, useEffect, useState } from 'react';
+import { ActionItemsPanel } from '@/components/ActionItemsPanel';
 import { useAuth } from '@/components/AuthProvider';
 import { MediaPlayer } from '@/components/MediaPlayer';
 import { MeetingSummaryView } from '@/components/MeetingSummaryView';
@@ -16,7 +18,6 @@ import {
 } from '@/lib/lists';
 import { isMeetingConvenor } from '@/lib/rbac';
 import type { Meeting, MeetingParticipant, MeetingSummary, TenantUser } from '@/lib/types';
-import { ActionItemsPanel } from '@/components/ActionItemsPanel';
 
 async function fetchTenantUsers(): Promise<TenantUser[]> {
   try {
@@ -135,6 +136,10 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
     (artifact) => artifact.artifact_type === 'audio' || artifact.artifact_type === 'video',
   );
   const invitees = excludeExistingParticipants(tenantUsers, participants, user?.id);
+  // Everyone heard in this meeting: the meeting's speaker list, or the speakers on the transcript segments.
+  const meetingSpeakers = meeting.speakers?.length
+    ? meeting.speakers
+    : (transcript?.segments ?? []).flatMap((segment) => (segment.speaker ? [segment.speaker] : []));
 
   return (
     <div>
@@ -283,12 +288,13 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
             <h3>Notes not ready</h3>
             <p>Notes generate automatically once the transcript finishes processing.</p>
           </div>
-                )}
+        )}
       </section>
 
       <ActionItemsPanel
         meetingId={meeting.id}
         participants={participants}
+        speakers={meetingSpeakers}
         canManage={canManage}
         currentUserId={user?.id}
         refreshKey={summary?.id}
