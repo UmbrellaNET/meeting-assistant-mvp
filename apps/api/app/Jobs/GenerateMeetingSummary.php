@@ -1,7 +1,7 @@
-<?php 
- 
+<?php
+
 namespace App\Jobs;
-  
+
 use App\Models\ActionItem;
 use App\Models\Meeting;
 use App\Models\MeetingSummary;
@@ -49,9 +49,12 @@ class GenerateMeetingSummary implements ShouldQueue
             ))
             ->implode("\n");
 
+        // Everyone in the meeting: participants with accounts, plus every speaker heard in the transcript.
         $attendees = $meeting->participants
             ->map(fn ($participant) => $participant->user?->name ?? $participant->display_name ?? null)
+            ->merge($transcript->segments->map(fn ($segment) => $segment->speaker?->display_name))
             ->filter()
+            ->unique(fn ($name) => mb_strtolower(trim((string) $name)))
             ->values()
             ->all();
 
