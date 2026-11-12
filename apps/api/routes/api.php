@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ActionItemController;
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\AdminRoleController;
 use App\Http\Controllers\Api\AdminUserController;
@@ -19,13 +20,6 @@ use App\Http\Controllers\Api\CalendarExportController;
 use App\Http\Controllers\Api\PublicCalendarExportController;
 use App\Http\Controllers\Api\ShareLinkController;
 use App\Http\Controllers\Api\MeetingSummaryController;
-use App\Http\Controllers\Api\ActionItemController;
-
-Route::get('/action-items', [ActionItemController::class, 'mine']);
-Route::get('/meetings/{meeting}/action-items', [ActionItemController::class, 'index']);
-Route::post('/meetings/{meeting}/action-items', [ActionItemController::class, 'store']);
-Route::patch('/action-items/{actionItem}', [ActionItemController::class, 'update']);
-Route::delete('/action-items/{actionItem}', [ActionItemController::class, 'destroy']);
 
 Route::prefix('auth')->group(function (): void {
     Route::post('register', [AuthController::class, 'register']);
@@ -55,6 +49,13 @@ Route::middleware('api.token')->group(function (): void {
 
     Route::get('meetings/{meeting}/summary', [MeetingSummaryController::class, 'show']);
     Route::post('meetings/{meeting}/summary/regenerate', [MeetingSummaryController::class, 'regenerate']);
+
+    // Action items (inside the api.token group so $request->user() is always set)
+    Route::get('action-items', [ActionItemController::class, 'mine']);
+    Route::get('meetings/{meeting}/action-items', [ActionItemController::class, 'index']);
+    Route::post('meetings/{meeting}/action-items', [ActionItemController::class, 'store']);
+    Route::patch('action-items/{actionItem}', [ActionItemController::class, 'update']);
+    Route::delete('action-items/{actionItem}', [ActionItemController::class, 'destroy']);
 
     Route::apiResource('meetings', MeetingController::class)->only(['index', 'store', 'show', 'destroy']);
     Route::post('meetings/{meeting}/invitations', [InvitationController::class, 'store']);
