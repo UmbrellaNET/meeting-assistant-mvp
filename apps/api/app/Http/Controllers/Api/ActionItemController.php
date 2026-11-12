@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-// Put in: apps/api/app/Http/Controllers/Api/ActionItemController.php
+
 class ActionItemController extends Controller
 {
     /** Action items for one meeting. */
@@ -30,6 +30,7 @@ class ActionItemController extends Controller
     public function mine(Request $request): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user, 401);
 
         $items = ActionItem::with('meeting:id,title,scheduled_start_at')
             ->where('tenant_id', $user->tenant_id)
@@ -51,6 +52,7 @@ class ActionItemController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:1000'],
             'owner_user_id' => ['nullable', 'string'],
+            'owner_name' => ['nullable', 'string', 'max:255'],
             'due_date' => ['nullable', 'date_format:Y-m-d'],
             'priority' => ['nullable', Rule::in(ActionItem::PRIORITIES)],
             'context' => ['nullable', 'string', 'max:2000'],
@@ -62,6 +64,9 @@ class ActionItemController extends Controller
             $participant = $meeting->participants()->with('user')->where('user_id', $ownerId)->first();
             abort_unless($participant, 422, 'Owner must be a participant of this meeting.');
             $ownerName = $participant->user?->name;
+        } else {
+            // A name heard in the transcript (not a user account), or no owner.
+            $ownerName = trim((string) ($data['owner_name'] ?? '')) ?: null;
         }
 
         $item = ActionItem::create([
@@ -90,19 +95,22 @@ class ActionItemController extends Controller
         $data = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:1000'],
             'owner_user_id' => ['sometimes', 'nullable', 'string'],
+            'owner_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'due_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'status' => ['sometimes', Rule::in(ActionItem::STATUSES)],
             'priority' => ['sometimes', Rule::in(ActionItem::PRIORITIES)],
             'context' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
-        if (array_key_exists('owner_user_id', $data)) {
-            if ($data['owner_user_id']) {
+        if (array_key_exists('owner_user_id', $data) || array_key_exists('owner_name', $data)) {
+            if (!empty($data['owner_user_id'])) {
                 $participant = $meeting->participants()->with('user')->where('user_id', $data['owner_user_id'])->first();
                 abort_unless($participant, 422, 'Owner must be a participant of this meeting.');
                 $data['owner_name'] = $participant->user?->name;
             } else {
-                $data['owner_name'] = null;
+                // A name heard in the transcript (not a user account), or no owner at all.
+                $data['owner_user_id'] = null;
+                $data['owner_name'] = trim((string) ($data['owner_name'] ?? '')) ?: null;
             }
         }
 
@@ -131,6 +139,8 @@ class ActionItemController extends Controller
 
     private function authorizeView(Request $request, Meeting $meeting): void
     {
+        // A missing user means the route is outside the auth middleware group: answer 401, not a 500.
+        abort_unless($request->user(), 401);
         abort_unless($meeting->tenant_id === $request->user()->tenant_id, 404);
         abort_unless($request->user()->can('view', $meeting), 403);
     }
@@ -139,6 +149,7 @@ class ActionItemController extends Controller
     private function canEdit(Request $request, Meeting $meeting, ?ActionItem $item = null): bool
     {
         $user = $request->user();
+        abort_unless($user, 401);
 
         if ($user->hasRole('super-admin')) {
             return true;
