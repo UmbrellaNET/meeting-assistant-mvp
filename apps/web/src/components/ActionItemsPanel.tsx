@@ -1,6 +1,6 @@
 'use client';
 
-// Put in: components/ActionItemsPanel.tsx
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/components/ToastProvider';
@@ -17,9 +17,14 @@ const STATUS_LABELS: Record<ActionItemStatus, string> = {
 
 type Filter = 'all' | 'active' | 'closed';
 
+/** A person who can own an item: a meeting participant with an account, or a speaker heard in the transcript. */
+type Person = { key: string; label: string; userId: string | null };
+
 type Props = {
   meetingId: string;
   participants: MeetingParticipant[];
+  /** Speakers identified in this meeting's transcript. */
+  speakers?: { display_name?: string | null }[];
   /** Convenors and admins: can add, assign and delete. */
   canManage: boolean;
   currentUserId?: string;
@@ -27,14 +32,23 @@ type Props = {
   refreshKey?: string | number | null;
 };
 
+const normalize = (value: string) => value.trim().toLowerCase();
+
 function todayIso(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-const emptyDraft = { title: '', owner_user_id: '', due_date: '' };
+/** Turn a select value ("user:<id>", "name:<label>" or "") into the fields the API expects. */
+function ownerChanges(value: string): { owner_user_id: string | null; owner_name: string | null } {
+  if (value.startsWith('user:')) return { owner_user_id: value.slice(5), owner_name: null };
+  if (value.startsWith('name:')) return { owner_user_id: null, owner_name: value.slice(5) };
+  return { owner_user_id: null, owner_name: null };
+}
 
-export function ActionItemsPanel({ meetingId, participants, canManage, currentUserId, refreshKey }: Props) {
+const emptyDraft = { title: '', owner: '', due_date: '' };
+
+export function ActionItemsPanel({ meetingId, participants, speakers = [], canManage, currentUserId, refreshKey }: Props) {
   const toast = useToast();
   const [items, setItems] = useState<ActionItem[] | null>(null);
   const [error, setError] = useState('');
@@ -44,7 +58,35 @@ export function ActionItemsPanel({ meetingId, participants, canManage, currentUs
   const [deleting, setDeleting] = useState<ActionItem | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const owners = useMemo(() => participants.filter((participant) => participant.user_id), [participants]);
+  // People in this meeting: everyone heard in the transcript, plus participants. A speaker whose name
+  // matches a participant is merged into that participant so the item is linked to their account.
+  const people = useMemo<Person[]>(() => {
+    const list: Person[] = [];
+    const seen = new Set<string>();
+
+    for (const participant of participants) {
+      if (!participant.user_id) continue;
+      const label = participantLabel(participant);
+      list.push({ key: `user:${participant.user_id}`, label, userId: participant.user_id });
+      seen.add(normalize(label));
+    }
+
+    for (const speaker of speakers) {
+      const label = (speaker.display_name ?? '').trim();
+      if (!label || seen.has(normalize(label))) continue;
+
+      // "Tom" in the transcript matches "Tom Smith" the participant, if that is the only Tom.
+      const firstNameMatches = list.filter(
+        (person) => person.userId && normalize(person.label).split(/\s+/).includes(normalize(label)),
+      );
+      if (firstNameMatches.length === 1) continue;
+
+      list.push({ key: `name:${label}`, label, userId: null });
+      seen.add(normalize(label));
+    }
+
+    return list.sort((a, b) => a.label.localeCompare(b.label));
+  }, [participants, speakers]);
 
   const load = useCallback(async () => {
     try {
@@ -59,9 +101,26 @@ export function ActionItemsPanel({ meetingId, participants, canManage, currentUs
     void load();
   }, [load, refreshKey]);
 
+  /** The select value that represents an item's current owner. */
+  const ownerValue = (item: ActionItem): string => {
+    if (item.owner_user_id) return `user:${item.owner_user_id}`;
+    const name = item.owner_name?.trim();
+    if (!name) return '';
+    const match = people.find((person) => !person.userId && normalize(person.label) === normalize(name));
+    return match ? match.key : `name:${name}`;
+  };
+
+  /** Options for one row: the meeting's people, plus the item's current owner if they are not in that list. */
+  const optionsFor = (item: ActionItem): Person[] => {
+    const current = ownerValue(item);
+    if (!current || people.some((person) => person.key === current)) return people;
+    const label = current.startsWith('name:') ? current.slice(5) : (item.owner_name ?? 'Unknown');
+    return [...people, { key: current, label, userId: null }];
+  };
+
   const update = async (
     item: ActionItem,
-    changes: Partial<Pick<ActionItem, 'title' | 'owner_user_id' | 'due_date' | 'status' | 'priority'>>,
+    changes: Partial<Pick<ActionItem, 'title' | 'owner_user_id' | 'owner_name' | 'due_date' | 'status' | 'priority'>>,
   ) => {
     const previous = items;
     setItems((current) => (current ?? []).map((row) => (row.id === item.id ? { ...row, ...changes } : row)));
@@ -77,6 +136,13 @@ export function ActionItemsPanel({ meetingId, participants, canManage, currentUs
     }
   };
 
+  const changeOwner = (item: ActionItem, value: string) => {
+    const changes = ownerChanges(value);
+    // Show the chosen person's name straight away; the server's answer replaces it.
+    const label = people.find((person) => person.key === value)?.label ?? changes.owner_name;
+    void update(item, { ...changes, owner_name: changes.owner_user_id ? label : changes.owner_name });
+  };
+
   const add = async (event: FormEvent) => {
     event.preventDefault();
     if (!draft.title.trim()) return;
@@ -86,7 +152,7 @@ export function ActionItemsPanel({ meetingId, participants, canManage, currentUs
         method: 'POST',
         body: JSON.stringify({
           title: draft.title.trim(),
-          owner_user_id: draft.owner_user_id || null,
+          ...ownerChanges(draft.owner),
           due_date: draft.due_date || null,
         }),
       });
@@ -162,14 +228,14 @@ export function ActionItemsPanel({ meetingId, participants, canManage, currentUs
             maxLength={1000}
           />
           <select
-            value={draft.owner_user_id}
-            onChange={(event) => setDraft((current) => ({ ...current, owner_user_id: event.target.value }))}
+            value={draft.owner}
+            onChange={(event) => setDraft((current) => ({ ...current, owner: event.target.value }))}
             aria-label="Owner"
           >
             <option value="">Unassigned</option>
-            {owners.map((participant) => (
-              <option key={participant.user_id} value={participant.user_id}>
-                {participantLabel(participant)}
+            {people.map((person) => (
+              <option key={person.key} value={person.key}>
+                {person.label}
               </option>
             ))}
           </select>
@@ -204,7 +270,6 @@ export function ActionItemsPanel({ meetingId, participants, canManage, currentUs
           const closed = item.status === 'done' || item.status === 'cancelled';
           const dueDate = item.due_date ? item.due_date.slice(0, 10) : '';
           const overdue = Boolean(dueDate) && dueDate < today && !closed;
-          const unmatchedOwner = !item.owner_user_id && item.owner_name;
 
           return (
             <div className={`action-row${closed ? ' is-closed' : ''}`} key={item.id}>
@@ -219,19 +284,18 @@ export function ActionItemsPanel({ meetingId, participants, canManage, currentUs
               <div className="action-main">
                 <strong>{item.title}</strong>
                 {item.context ? <small>{item.context}</small> : null}
-                {unmatchedOwner ? <small>Owner named in the meeting: {item.owner_name}</small> : null}
                 {item.due_text && !dueDate ? <small>Deadline mentioned: {item.due_text}</small> : null}
               </div>
               <select
-                value={item.owner_user_id ?? ''}
+                value={ownerValue(item)}
                 disabled={!canManage}
-                onChange={(event) => void update(item, { owner_user_id: event.target.value || null })}
+                onChange={(event) => changeOwner(item, event.target.value)}
                 aria-label="Owner"
               >
                 <option value="">Unassigned</option>
-                {owners.map((participant) => (
-                  <option key={participant.user_id} value={participant.user_id}>
-                    {participantLabel(participant)}
+                {optionsFor(item).map((person) => (
+                  <option key={person.key} value={person.key}>
+                    {person.label}
                   </option>
                 ))}
               </select>
