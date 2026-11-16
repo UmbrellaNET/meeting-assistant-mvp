@@ -1,8 +1,9 @@
 'use client';
 
 // Save as: app/meetings/[id]/page.tsx  (this file replaces the existing meeting detail page)
-import { FormEvent, use, useCallback, useEffect, useState } from 'react';
+import { FormEvent, use, useCallback, useEffect, useRef, useState } from 'react';
 import { ActionItemsPanel } from '@/components/ActionItemsPanel';
+import { FollowUpEmailPanel } from '@/components/FollowUpEmailPanel';
 import { useAuth } from '@/components/AuthProvider';
 import { MediaPlayer } from '@/components/MediaPlayer';
 import { MeetingSummaryView } from '@/components/MeetingSummaryView';
@@ -54,6 +55,7 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
   const [inviting, setInviting] = useState(false);
   const [artifactType, setArtifactType] = useState('uploaded_transcript');
   const [summary, setSummary] = useState<MeetingSummary>(null);
+  const scrolledToSegment = useRef(false);
 
   const load = useCallback(async () => {
     const next = await api<Meeting>(`/meetings/${id}`);
@@ -82,6 +84,21 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
     if (!canManage) return;
     fetchTenantUsers().then(setTenantUsers);
   }, [canManage]);
+
+  // Deep link from search results: /meetings/<id>?segment=<segmentId>#transcript
+  useEffect(() => {
+    if (!meeting || scrolledToSegment.current) return;
+    const segmentId = new URLSearchParams(window.location.search).get('segment');
+    if (!segmentId) return;
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(`segment-${segmentId}`) ?? document.getElementById('transcript');
+      if (target) {
+        scrolledToSegment.current = true;
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [meeting]);
 
   const upload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -300,7 +317,15 @@ export default function MeetingDetail({ params }: { params: Promise<{ id: string
         refreshKey={summary?.id}
       />
 
-      <section className="panel transcript-panel">
+      {canManage ? (
+        <FollowUpEmailPanel
+          meetingId={meeting.id}
+          participants={participants}
+          summaryReady={summary?.status === 'completed'}
+        />
+      ) : null}
+
+      <section className="panel transcript-panel" id="transcript">
         <div className="panel-heading">
           <div>
             <h2>Transcript Review</h2>
