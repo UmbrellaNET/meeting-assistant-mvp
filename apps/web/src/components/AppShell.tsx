@@ -12,6 +12,7 @@ const appLinks = [
   { href: '/', label: 'Dashboard', match: (path: string) => path === '/' },
   { href: '/calendar', label: 'Calendar', match: (path: string) => path.startsWith('/calendar') },
   { href: '/meetings', label: 'Meetings', match: (path: string) => path.startsWith('/meetings') },
+  { href: '/search', label: 'Search', match: (path: string) => path.startsWith('/search') },
   { href: '/assistant', label: 'Meeting Assistant', match: (path: string) => path.startsWith('/assistant') },
   { href: '/settings', label: 'Settings', match: (path: string) => path.startsWith('/settings') },
 ];
