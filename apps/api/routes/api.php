@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\ActionItemController;
+use App\Http\Controllers\Api\FollowUpController;
+use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\AdminRoleController;
 use App\Http\Controllers\Api\AdminUserController;
@@ -56,6 +58,15 @@ Route::middleware('api.token')->group(function (): void {
     Route::post('meetings/{meeting}/action-items', [ActionItemController::class, 'store']);
     Route::patch('action-items/{actionItem}', [ActionItemController::class, 'update']);
     Route::delete('action-items/{actionItem}', [ActionItemController::class, 'destroy']);
+
+    // Follow-up email drafts
+    Route::get('meetings/{meeting}/follow-up', [FollowUpController::class, 'show']);
+    Route::post('meetings/{meeting}/follow-up/generate', [FollowUpController::class, 'generate']);
+    Route::patch('follow-up-drafts/{draft}', [FollowUpController::class, 'update']);
+    Route::post('follow-up-drafts/{draft}/send', [FollowUpController::class, 'send'])->middleware('throttle:10,1');
+
+    // Search across the user's meetings
+    Route::get('search', [SearchController::class, 'index'])->middleware('throttle:60,1');
 
     Route::apiResource('meetings', MeetingController::class)->only(['index', 'store', 'show', 'destroy']);
     Route::post('meetings/{meeting}/invitations', [InvitationController::class, 'store']);
