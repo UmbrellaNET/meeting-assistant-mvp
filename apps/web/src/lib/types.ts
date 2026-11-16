@@ -228,3 +228,15 @@ export type ActionItem = {
   created_at: string;
   updated_at: string;
 };
+
+export type FollowUpDraft = {
+  id: string;
+  meeting_id: string;
+  subject: string;
+  body: string;
+  recipients: string[];
+  status: 'draft' | 'sent';
+  sent_at?: string | null;
+  sent_to?: string[] | null;
+  updated_at: string;
+};
