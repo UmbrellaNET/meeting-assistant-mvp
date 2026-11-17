@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Api\ActionItemController;
 use App\Http\Controllers\Api\FollowUpController;
+use App\Http\Controllers\Api\AskController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\SearchIndexController;
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\AdminRoleController;
 use App\Http\Controllers\Api\AdminUserController;
@@ -67,6 +69,8 @@ Route::middleware('api.token')->group(function (): void {
 
     // Search across the user's meetings
     Route::get('search', [SearchController::class, 'index'])->middleware('throttle:60,1');
+    Route::post('ask', [AskController::class, 'ask'])->middleware('throttle:20,1');
+    Route::post('search/reindex', [SearchIndexController::class, 'rebuild'])->middleware('throttle:3,1');
 
     Route::apiResource('meetings', MeetingController::class)->only(['index', 'store', 'show', 'destroy']);
     Route::post('meetings/{meeting}/invitations', [InvitationController::class, 'store']);
