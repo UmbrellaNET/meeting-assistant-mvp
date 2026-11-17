@@ -8,25 +8,28 @@ use App\Models\MeetingSpeaker;
 use App\Models\MeetingSummary;
 use App\Models\TranscriptSegment;
 use App\Models\TranscriptVersion;
+use App\Services\ChunkSearch;
+use App\Services\GeminiClient;
+use App\Support\MeetingAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-// Put in: apps/api/app/Http/Controllers/Api/SearchController.php
+// Put in: apps/api/app/Http/Controllers/Api/SearchController.php  (replaces the earlier version)
 class SearchController extends Controller
 {
     /**
-     * Full-text search across the meetings the signed-in user attended (accepted participants only):
-     * transcript lines, meeting notes and meeting titles. Matches are marked with ⟦ ⟧ so the web app can
-     * highlight them without ever rendering database text as HTML.
+     * Search across the meetings the signed-in user attended (accepted participants only):
+     * exact keyword matches in transcripts, notes and titles, plus passages that are close in meaning.
+     * Keyword matches are marked with ⟦ ⟧ so the web app can highlight them without rendering database text as HTML.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, GeminiClient $gemini, ChunkSearch $chunkSearch): JsonResponse
     {
         $user = $request->user();
         abort_unless($user, 401);
 
         $q = trim((string) $request->query('q', ''));
-        $empty = ['query' => $q, 'notes' => [], 'segments' => [], 'meetings' => []];
+        $empty = ['query' => $q, 'notes' => [], 'segments' => [], 'meetings' => [], 'related' => [], 'semantic' => false];
         if (mb_strlen($q) < 2) {
             return response()->json($empty);
         }
@@ -34,14 +37,7 @@ class SearchController extends Controller
         $empty['query'] = $q;
 
         // Permissions first: only meetings this user attended are ever searched.
-        $meetingIds = Meeting::query()
-            ->where('tenant_id', $user->tenant_id)
-            ->whereHas('participants', fn ($participants) => $participants
-                ->where('user_id', $user->id)
-                ->where('status', 'accepted'))
-            ->pluck('id')
-            ->all();
-
+        $meetingIds = MeetingAccess::idsFor($user);
         if ($meetingIds === []) {
             return response()->json($empty);
         }
@@ -97,11 +93,39 @@ class SearchController extends Controller
             ->limit(10)
             ->get(['id', 'title', 'scheduled_start_at', 'created_at']);
 
+        // Passages that are close in meaning (needs GEMINI_API_KEY and indexed meetings). Failure never breaks keyword search.
+        $related = [];
+        $semantic = false;
+        if ($gemini->configured()) {
+            try {
+                $vector = GeminiClient::vectorLiteral($gemini->embedOne($q, 'RETRIEVAL_QUERY'));
+                $related = $chunkSearch->nearest($vector, $meetingIds, 8, 0.55)
+                    ->map(fn (array $row) => [
+                        'chunk_id' => $row['id'],
+                        'meeting_id' => $row['meeting_id'],
+                        'meeting_title' => $row['meeting_title'],
+                        'scheduled_start_at' => $row['scheduled_start_at'],
+                        'created_at' => $row['meeting_created_at'],
+                        'segment_id' => $row['segment_id'],
+                        'start_ms' => $row['start_ms'],
+                        'end_ms' => $row['end_ms'],
+                        'text' => mb_substr($row['content'], 0, 400),
+                        'distance' => round($row['distance'], 3),
+                    ])
+                    ->all();
+                $semantic = true;
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         return response()->json([
             'query' => $q,
             'notes' => $notes,
             'segments' => $segments,
             'meetings' => $meetings,
+            'related' => $related,
+            'semantic' => $semantic,
         ]);
     }
 }
