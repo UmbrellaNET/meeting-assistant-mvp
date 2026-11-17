@@ -1,6 +1,9 @@
 'use client';
 
+// Save as: apps/web/src/app/assistant/page.tsx  (replaces the existing page)
 import { useCallback, useEffect, useState } from 'react';
+import { AskMeetingsPanel } from '@/components/AskMeetingsPanel';
+import { useAuth } from '@/components/AuthProvider';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable } from '@/components/DataTable';
 import { IconButton, TableActions } from '@/components/IconButton';
@@ -13,10 +16,12 @@ import type { Meeting } from '@/lib/types';
 
 export default function AssistantPage() {
   const toast = useToast();
+  const { isSuperAdmin } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[] | null>(null);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<Meeting | null>(null);
   const [busy, setBusy] = useState(false);
+  const [indexing, setIndexing] = useState(false);
 
   const load = useCallback(() => {
     return api<unknown>('/meetings')
@@ -43,13 +48,33 @@ export default function AssistantPage() {
     }
   };
 
+  // Super admins: index meetings that were processed before search was added.
+  const reindex = async () => {
+    setIndexing(true);
+    try {
+      const result = await api<{ queued: number }>('/search/reindex', { method: 'POST' });
+      toast.success(`Indexing ${result.queued} meeting${result.queued === 1 ? '' : 's'} in the background.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to start indexing');
+    } finally {
+      setIndexing(false);
+    }
+  };
+
   return (
     <div>
       <header className="page-header">
         <div>
           <h1>Meeting Assistant</h1>
         </div>
+        {isSuperAdmin ? (
+          <button type="button" className="secondary-button" onClick={() => void reindex()} disabled={indexing}>
+            {indexing ? 'Starting...' : 'Index existing meetings'}
+          </button>
+        ) : null}
       </header>
+
+      <AskMeetingsPanel />
 
       <DataTable
         search
