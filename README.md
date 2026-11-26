@@ -1,4 +1,4 @@
-# AI Meeting Assistant MVP Starter
+# AI Meeting Assistant MVP Starter 
 
 A development-ready monorepo for a post-meeting AI assistant. The starter focuses on the first vertical slice:
 
